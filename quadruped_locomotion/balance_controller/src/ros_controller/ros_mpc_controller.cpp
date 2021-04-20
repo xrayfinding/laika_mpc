@@ -1964,7 +1964,7 @@ namespace balance_controller{
         desired_com_position[0] = 0.0;
         desired_com_position[1] = 0.0;
         //0319
-        desired_com_position[2] = 0.40;
+        desired_com_position[2] = 0.36;
 
         //9.desire_vel
         LinearVelocity _desired_com_velocity = robot_state_->getTargetLinearVelocityBaseInWorldFrame();
