@@ -1,0 +1,13 @@
+sensor_msgs/JointState lf_leg_joints
+sensor_msgs/JointState rf_leg_joints
+sensor_msgs/JointState rh_leg_joints
+sensor_msgs/JointState lh_leg_joints
+nav_msgs/Odometry base_pose
+free_gait_msgs/LegMode lf_leg_mode
+free_gait_msgs/LegMode rf_leg_mode
+free_gait_msgs/LegMode rh_leg_mode
+free_gait_msgs/LegMode lh_leg_mode
+free_gait_msgs/EndEffectorTarget lf_target
+free_gait_msgs/EndEffectorTarget rf_target
+free_gait_msgs/EndEffectorTarget rh_target
+free_gait_msgs/EndEffectorTarget lh_target

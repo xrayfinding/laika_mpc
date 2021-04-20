@@ -1,0 +1,1 @@
+/usr/bin/c++    -rdynamic CMakeFiles/udp_recv_test.dir/examples/multi_pc/server/udp_recv_test.cpp.o  -o udp_recv_test  -L/home/glx/laikago_catkin/src/laikago_sdk/lib -Wl,-rpath,/home/glx/laikago_catkin/src/laikago_sdk/lib -pthread -llaikago_comm -llcm 

@@ -1,0 +1,23 @@
+joint_state_publisher:
+  type: "joint_state_controller/JointStateController"
+  publish_rate: 50
+
+all_joints_position_group_controller:
+  type: position_controllers/JointGroupPositionController
+  joints: ['joint1', 'joint2']
+  joint1/pid: {p: 1000.0, i: 0.01, d: 10.0}
+  joint2/pid: {p: 1000.0, i: 0.01, d: 10.0}
+
+
+all_joints_velocity_group_controller:
+  type: velocity_controllers/JointGroupVelocityController
+  joints: ['joint1', 'joint2']
+  joint1/pid: {p: 1000.0, i: 0.01, d: 10.0}
+  joint2/pid: {p: 1000.0, i: 0.01, d: 10.0}
+
+all_joints_effort_group_controller:
+  type: effort_controllers/JointGroupEffortController
+  joints: ['joint1', 'joint2']
+  joint1/pid: {p: 1000.0, i: 0.01, d: 10.0}
+  joint2/pid: {p: 1000.0, i: 0.01, d: 10.0}
+

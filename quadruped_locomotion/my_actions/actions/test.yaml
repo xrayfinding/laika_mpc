@@ -1,0 +1,157 @@
+actions:
+  - action:
+      id: "1"
+      name: sit down
+      file: motion_scripts/sitdown.yaml
+      type: yaml
+      description: robot sit down
+  - action:
+      id: "2"
+      name: stand up
+      file: motion_scripts/standup.yaml
+      type: yaml
+      description: robot stand
+  - action:
+      id: "3"
+      name: walk a cycle
+      file: motion_scripts/stational_walk.yaml
+      type: yaml
+      description: robot walk a cycle
+  - action:
+      id: "4"
+      name: base_target demo
+      file: motion_scripts/base_target_demo.yaml
+      type: yaml
+      description: robot base move a rectangle
+  - action:
+      id: "5"
+      name: end effector target demo
+      file: motion_scripts/end_effectors_target_demo.yaml
+      type: yaml
+      description: robot move leg end effector
+  - action:
+      id: "6"
+      name: base pitch rotate
+      file: motion_scripts/base_rotate_pitch.yaml
+      type: yaml
+      description: base pitch rotate 20 degree
+  - action:
+      id: "7"
+      name: base yaw rotate
+      file: motion_scripts/base_rotate_yaw.yaml
+      type: yaml
+      description: base yaw rotate 20 degree
+  - action:
+      id: "8"
+      name: base roll rotate
+      file: motion_scripts/base_rotate_roll.yaml
+      type: yaml
+      description: base roll rotate 20 degree
+  - action:
+      id: "9"
+      name: base pitch and yaw rotate
+      file: motion_scripts/base_rotate_yaw_pitch.yaml
+      type: yaml
+      description: base yaw and pitch rotate
+  - action:
+      id: "10"
+      name: pace in Gazebo
+      file: motion_scripts/pace_gazebo.yaml
+      type: yaml
+      description: a cycle of pace motion in gazebo
+  - action:
+      id: "11"
+      name: trot in Gazebo
+      file: motion_scripts/trot_test.yaml
+      type: yaml
+      description: a cycle of trot motion in gazebo
+  - action:
+      id: "12"
+      name: change to spot
+      file: motion_scripts/change_to_spot.yaml
+      type: yaml
+      description: change the leg configuration to a "Spot" like
+  - action:
+     id: "13"
+     name: Leg move Demo
+     file: motion_scripts/leg_move.yaml
+     type: yaml
+     description: move four legs
+  - action:
+     id: "14"
+     name: Jump Once
+     file: motion_scripts/jump.yaml
+     type: yaml
+     description: jump once
+  - action:
+     id: "15"
+     name: EndEffector move Demo
+     file: motion_scripts/end_effector_trajectory_demo.yaml
+     type: yaml
+     description: EndEffectorTrajectory step demo
+  - action:
+      id: "16"
+      name: stand middle
+      file: motion_scripts/stand_middle.yaml
+      type: yaml
+      description: robot stand at a height of 0.3
+  - action:
+      id: "17"
+      name: change leg configure
+      file: motion_scripts/joints_move.yaml
+      type: yaml
+      description: change leg configure to '<<' type
+  - action:
+      id: "18"
+      name: kick a ball
+      file: motion_scripts/kick_ball.yaml
+      type: yaml
+      description: LF leg kick a ball
+  - action:
+      id: "19"
+      name: step demo
+      file: motion_scripts/step_demo.yaml
+      type: yaml
+      description: step with different profile type
+  - action:
+      id: "20"
+      name: reset leg mode
+      file: motion_scripts/reset_legmode.yaml
+      type: yaml
+      description: reset all leg as support leg
+  - action:
+      id: "21"
+      name: shake leg
+      file: motion_scripts/shake_leg.yaml
+      type: yaml
+      description: move LF leg high to shake
+  - action:
+      id: "22"
+      name: push elevator 1
+      file: motion_scripts/push_elevator.yaml
+      type: yaml
+      description: move LF leg high to oush elevator step 1
+  - action:
+      id: "23"
+      name: push elevator 2
+      file: motion_scripts/push_elevator2.yaml
+      type: yaml
+      description: move LF leg high to oush elevator step 2
+  - action:
+      id: "24"
+      name: joint mode switch
+      file: motion_scripts/joint_mode_switch.yaml
+      type: yaml
+      description: move LF leg with Profile Position and SYNC Torque
+  - action:
+      id: "25"
+      name: step down
+      file: motion_scripts/step_down.yaml
+      type: yaml
+      description: move LF leg down to a foothold
+  - action:
+      id: "26"
+      name: climb_stairs
+      file: motion_scripts/climb_stairs.yaml
+      type: yaml
+      description: crawl gait to climb stairs

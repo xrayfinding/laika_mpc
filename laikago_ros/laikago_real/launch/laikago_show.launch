@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<launch>
+
+    <arg name="user_debug" default="true"/>
+    
+    <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find simpledog)/urdf/laikago/my_laika.xacro'
+            DEBUG:=$(arg user_debug)"/>
+
+  <!--  <rosparam command="load" file="$(find laikago_controller)/config/control.yaml" />
+    <node name="base_controller_spawner" pkg="controller_manager" type="spawner"
+      args="simpledog_joint_publisher" /> -->
+
+    <!-- for higher robot_state_publisher average rate-->
+    <!-- <param name="rate" value="1000"/> -->
+
+    <!-- send fake joint values -->
+  <!--  <node pkg="joint_state_publisher" type="joint_state_publisher" name="joint_state_publisher">
+        <param name="use_gui" value="TRUE"/>
+    </node> -->
+
+    <node pkg="laikago_real" type="robotState" name="robotState">
+    </node>
+
+    <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher">
+        <param name="publish_frequency" type="double" value="500.0"/>
+    </node>
+
+    <node pkg="rviz" type="rviz" name="rviz" respawn="false" output="screen"
+        args="-d $(find laikago_description)/launch/check_joint.rviz"/>
+
+</launch>

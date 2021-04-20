@@ -1,0 +1,34 @@
+<class_libraries>
+  <library path="lib/libgazebo_state_hardware_interface">
+    <class name="balance_controller/SimRobotStateHardwareInterface"
+           type="balance_controller::SimRobotStateHardwareInterface"
+           base_class_type="gazebo_ros_control::RobotHWSim">
+      <description>A gazebo interface with robot state .</description>
+    </class>
+  </library>
+
+  <library path="lib/librobot_state_lcm_hardware_interface">
+    <class name="balance_controller/RobotStateLcmHardwareInterface"
+           type="balance_controller::RobotStateLcmHardwareInterface"
+           base_class_type="hardware_interface::RobotHW">
+      <description>A lcm communication interface with robot state .</description>
+    </class>
+  </library>
+
+  <library path="lib/libros_balance_controller">
+    <class name="balance_controller/RosBalanceController"
+           type="balance_controller::RosBalanceController"
+           base_class_type="controller_interface::ControllerBase">
+      <description>A gazebo interface with robot state .</description>
+    </class>
+  </library>
+
+  <library path="lib/libros_mpc_controller">
+    <class name="balance_controller/RosMpcController"
+           type="balance_controller::RosMpcController"
+           base_class_type="controller_interface::ControllerBase">
+      <description>A gazebo interface with robot state .</description>
+    </class>
+  </library>
+
+</class_libraries>

@@ -1,0 +1,8 @@
+<library path="lib/liblaikago_ros_control">
+  <class name="laikago_ros_control/RobotStateLcmHardwareInterface" type="laikago_ros_control::RobotStateLcmHardwareInterface"
+base_class_type="hardware_interface::RobotHW">
+    <description>
+     HardWare Interface for Laikago
+    </description>
+  </class>
+</library>

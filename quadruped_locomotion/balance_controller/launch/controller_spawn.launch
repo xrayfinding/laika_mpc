@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<launch>
+
+<!-- Spawn controllers -->
+<node name="base_controller_spawner" pkg="controller_manager" type="spawner"
+      args=" state_estimate_update" />
+
+
+</launch>
