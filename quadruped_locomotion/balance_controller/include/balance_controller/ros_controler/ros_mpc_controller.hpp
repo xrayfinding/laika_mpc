@@ -100,7 +100,12 @@ public:
       double loadFactor_;
 
     };
-
+    enum class CtrlEnum{
+        MIT,
+        PYBULLET,
+        YG,
+        GKD,
+    };
     std::map<free_gait::LimbEnum, LegInfo> legInfos_;
     ros::Time time_test;
  private:
@@ -227,7 +232,9 @@ public:
     bool collections_4_mpc();
     bool collections_4_mpc(bool ispybulletways);
     bool collections_4_mpc(int is_mpc_use);
+    bool collections_4_mpc(CtrlEnum ctrl);
     bool computeJointTorques(std::vector<double>& _forces);
+    bool computeJointTorques(std::vector<double>& _forces,CtrlEnum ways);
     bool QuaternionToEuler_desired();
     bool QuaternionToEuler();
     bool loadParams_MPC(const ros::NodeHandle& node_handle);

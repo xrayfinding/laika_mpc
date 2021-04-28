@@ -44,16 +44,26 @@ balance_controller:
       friction_coefficient: 0.5
       minimal_normal_force: 10
       load_factor: 1
+# single_leg_controller:
+#   x_direction:
+#     kp: 1600
+#     kd: 75
+#   y_direction:
+#     kp: 1600
+#     kd: 75
+#   z_direction:
+#     kp: 1600
+#     kd: 75
 single_leg_controller:
   x_direction:
-    kp: 1600
-    kd: 75
+    kp: 700
+    kd: 7
   y_direction:
-    kp: 1600
-    kd: 75
+    kp: 700
+    kd: 7
   z_direction:
-    kp: 1600
-    kd: 75
+    kp: 160
+    kd: 7
 mpc:
   weights: [0.25, 0.25, 10, 2, 2, 50, 0., 0., 0.3, 2, 0.2, 0.1, 0]
   #roll-pitch-yaw x-y-z ang-vel vel gravity-place-holder
@@ -72,5 +82,5 @@ mpc:
   z_vel: 0.2
   gravity_holder: 0.0
   steps_MPC: 8
-  delta_t_MPC: 0.03
-  torque_weight: 0.00001
+  delta_t_MPC: 0.01
+  torque_weight: 0.000001

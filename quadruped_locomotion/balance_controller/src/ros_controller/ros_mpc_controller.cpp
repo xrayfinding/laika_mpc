@@ -596,10 +596,11 @@ namespace balance_controller{
 //        }
 //        vector<double> mpc_use = control_steps_mpc.front();
         Position footpos = robot_state->getPositionBaseToFootInBaseFrame(free_gait::LimbEnum::LF_LEG);
-        std::cout << "in mpc: "<<footpos.x() << " " << footpos.y() << " " << footpos.z()<< std::endl;
+        //std::cout << "in mpc: "<<footpos.x() << " " << footpos.y() << " " << footpos.z()<< std::endl;
         bool keep_flag = false;
         int mit_use = 1;
         bool _pybullet = true;
+        CtrlEnum ctrlx = CtrlEnum::MIT;
         if(!collections_4_mpc(mit_use))
           {
             ROS_ERROR("MPC compute failed");
@@ -632,7 +633,7 @@ namespace balance_controller{
 //            std::cout << mpc_use[i] << " - ";
 //        }
 //        std::cout << std::endl;
-        computeJointTorques(mpc_use);
+        computeJointTorques(mpc_use,ctrlx);
         for(int i = 0; i<4; i++)
           {
             /****************
@@ -1880,6 +1881,7 @@ namespace balance_controller{
         quaternion[1] = _rotation_orien.y();
         quaternion[2] = _rotation_orien.z();
         quaternion[3] = _rotation_orien.w();
+
         QuaternionToEuler();
         //std::cout<<"yaw" << com_roll_pitch_yaw[2] << " ";
         //com_roll_pitch_yaw[2] = 0;
@@ -1896,7 +1898,6 @@ namespace balance_controller{
         com_angular_velocity[0] = _com_angular_velocity.x();
         com_angular_velocity[1] = _com_angular_velocity.y();
         com_angular_velocity[2] = _com_angular_velocity.z();
-        std::cout << com_angular_velocity[2] << endl;
         //5.contact_states
         foot_contact_states.resize(4);
         for (const auto& leg : limbs_){
@@ -1953,7 +1954,7 @@ namespace balance_controller{
     //                 foot_positions_body_frame[1]<<" "<<
     //                 foot_positions_body_frame[2]<< endl;
         //7.frition_coeffs
-        foot_friction_coeffs = {0.45, 0.45, 0.45, 0.45};
+        foot_friction_coeffs = {0.6, 0.6, 0.6, 0.6};
         //8.desire_pos
         Position _desired_com_position = robot_state_->getTargetPositionWorldToBaseInWorldFrame();
         desired_com_position.resize(3);
@@ -2012,6 +2013,143 @@ namespace balance_controller{
         return  true;
     }
 
+    bool RosMpcController::collections_4_mpc(CtrlEnum ctrl){
+        if(ctrl == CtrlEnum::MIT){
+            const RotationQuaternion& orientationControlToBase = robot_state_->getOrientationBaseToWorld().inverted();//torso_->getMeasuredState().getOrientationControlToBase();
+            const RotationQuaternion& orientationWorldToBase = robot_state_->getOrientationBaseToWorld().inverted();//torso_->getMeasuredState().getOrientationWorldToBase();
+            const RotationQuaternion& orientationWorldToControl = orientationWorldToBase*orientationControlToBase.inverted();//robot_state_->getTargetOrientationBaseToWorld();//torso_->getMeasuredState().getOrientationWorldToControl();
+
+            //1.com_position
+            Position _com_position = robot_state_->getPositionWorldToBaseInWorldFrame();
+            com_position.resize(3);
+            com_position[0] = _com_position.x();
+            com_position[1] = _com_position.y();
+            com_position[2] = _com_position.z();
+
+            //2.com_velocity
+            LinearVelocity _com_velocity = robot_state_->getLinearVelocityBaseInWorldFrame();
+            com_velocity.resize(3);
+            com_velocity[0] = _com_velocity.x();
+            com_velocity[1] = _com_velocity.y();
+            com_velocity[2] = _com_velocity.z();
+            //3.rpy
+            com_roll_pitch_yaw.resize(3);
+            RotationQuaternion _rotation_orien= robot_state_->getOrientationBaseToWorld().inverted();
+            quaternion.resize(4);
+            quaternion[0] = _rotation_orien.x();
+            quaternion[1] = _rotation_orien.y();
+            quaternion[2] = _rotation_orien.z();
+            quaternion[3] = _rotation_orien.w();
+            EulerAnglesZyx ypr(_rotation_orien);
+            Eigen::Vector3d EulerAngle0 = ypr.setUnique().vector();
+            com_roll_pitch_yaw[2] = 0;
+            //QuaternionToEuler();
+            com_roll_pitch_yaw[0] = EulerAngle0(2);
+            com_roll_pitch_yaw[1] = EulerAngle0(1);
+            //4.ang_vel
+
+
+           // LocalAngularVelocity _com_angular_velocity =  robot_state_->getAngularVelocityBaseInBaseFrame();
+
+            LocalAngularVelocity _com_angular_velocity =  robot_state_->getAngularVelocityBaseInBaseFrame();
+            com_angular_velocity.resize(3);
+            com_angular_velocity[0] = _com_angular_velocity.x();
+            com_angular_velocity[1] = _com_angular_velocity.y();
+            com_angular_velocity[2] = _com_angular_velocity.z();
+            //5.contact_states
+            foot_contact_states.resize(4);
+            for (const auto& leg : limbs_){
+                int _n;
+                switch (leg) {
+                    case free_gait::LimbEnum::LF_LEG:
+                        _n = 0;
+                        break;
+                    case free_gait::LimbEnum::RF_LEG:
+                        _n = 1;
+                        break;
+                    case free_gait::LimbEnum::RH_LEG:
+                        _n = 2;
+                        break;
+                    case free_gait::LimbEnum::LH_LEG:
+                        _n = 3;
+                        break;
+                    default:
+                        ROS_ERROR("no leg be chosen");
+                }
+                if(robot_state_->isSupportLeg(leg)){
+                    foot_contact_states[_n] = 1;
+                }
+                else{
+                    foot_contact_states[_n] = 0;
+                }
+            }
+            //6.foot_postion
+            foot_positions_body_frame.resize(12);
+            for(const auto& leg: limbs_){
+                int _n;
+                switch (leg) {
+                    case free_gait::LimbEnum::LF_LEG:
+                        _n = 0;
+                        break;
+                    case free_gait::LimbEnum::RF_LEG:
+                        _n = 1;
+                        break;
+                    case free_gait::LimbEnum::RH_LEG:
+                        _n = 2;
+                        break;
+                    case free_gait::LimbEnum::LH_LEG:
+                        _n = 3;
+                        break;
+                    default:
+                        ROS_ERROR("no leg be chosen");
+                }
+                Position footpos = robot_state_->getPositionBaseToFootInBaseFrame(leg);
+                foot_positions_body_frame[_n * 3]  = footpos.x();
+                foot_positions_body_frame[_n * 3 + 1]  = footpos.y();
+                foot_positions_body_frame[_n * 3 + 2]  = footpos.z();
+            }
+        //    std::cout << "Real foot position: " << foot_positions_body_frame[0] <<" " <<
+        //                 foot_positions_body_frame[1]<<" "<<
+        //                 foot_positions_body_frame[2]<< endl;
+            //7.frition_coeffs
+            foot_friction_coeffs = {0.45, 0.45, 0.45, 0.45};
+            //8.desire_pos
+            Position _desired_com_position = robot_state_->getTargetPositionWorldToBaseInWorldFrame();
+            desired_com_position.resize(3);
+            desired_com_position[0] = 0;
+            desired_com_position[1] = 0;
+            desired_com_position[2] = _desired_com_position.z();
+            //0319
+            desired_com_position[2] = 0.36;
+            //9.desire_vel
+            LinearVelocity _desired_com_velocity = robot_state_->getTargetLinearVelocityBaseInWorldFrame();
+            desired_com_velocity.resize(3);
+            desired_com_velocity[0] = _desired_com_velocity.x();
+            desired_com_velocity[1] = _desired_com_velocity.y();
+            desired_com_velocity[2] = 0;
+            //10.desire_rpy
+            _rotation_orien = robot_state_->getTargetOrientationBaseToWorld();
+            desired_quaternion.resize(4);
+            desired_quaternion[0] = _rotation_orien.x();
+            desired_quaternion[1] = _rotation_orien.y();
+            desired_quaternion[2] = _rotation_orien.z();
+            desired_quaternion[3] = _rotation_orien.w();
+            desired_com_roll_pitch_yaw.resize(3);
+            EulerAnglesZyx ypr_d(_rotation_orien);
+            Eigen::Vector3d EulerAngle_d=ypr_d.setUnique().vector();
+            desired_com_roll_pitch_yaw[2] = 0;
+            desired_com_roll_pitch_yaw[0] = 0;
+            desired_com_roll_pitch_yaw[1] = 0;
+            //11.desire_ang_vel
+            LocalAngularVelocity _desired_com_angular_velocity = robot_state_->getTargetAngularVelocityBaseInBaseFrame();
+            desired_com_angular_velocity.resize(3);
+            desired_com_angular_velocity[0] = 0;
+            desired_com_angular_velocity[1] = 0;
+            desired_com_angular_velocity[2] = _desired_com_angular_velocity.z();
+            return  true;
+        }
+    }
+
     bool RosMpcController::computeJointTorques(std::vector<double>& _forces){
         const LinearAcceleration gravitationalAccelerationInWorldFrame = LinearAcceleration(0.0,0.0,-9.8);//torso_->getProperties().getGravity();
         const LinearAcceleration gravitationalAccelerationInBaseFrame = robot_state_->getOrientationBaseToWorld().inverseRotate(gravitationalAccelerationInWorldFrame);//torso_->getMeasuredState().getOrientationWorldToBase().rotate(gravitationalAccelerationInWorldFrame);
@@ -2058,6 +2196,39 @@ namespace balance_controller{
         return true;
     }
 
+    bool RosMpcController::computeJointTorques(std::vector<double>& _forces, CtrlEnum ways){
+        if(ways == CtrlEnum::MIT){
+            for (auto& legInfo : legInfos_)
+            {
+
+              /*
+               * Torque setpoints should be updated only is leg is support leg.
+               */
+              if  (robot_state_->isSupportLeg(legInfo.first)) {
+                if (legInfo.second.isPartOfForceDistribution_ or 1)
+                {
+                  Eigen::Matrix3d jacobian = robot_state_->getTranslationJacobianFromBaseToFootInBaseFrame(legInfo.first);
+                  int n_leg = static_cast<int>(legInfo.first);
+                  std::vector<double> _f;
+                  _f.resize(3);
+                  for (int i = 0; i < 3; i++) {
+                      _f[i] = _forces[i + 3*n_leg];
+                  }
+                  //Eigen::Vector3d force_mpc;
+                  Force contactForce_MPC;
+                  contactForce_MPC << _f[0], _f[1], _f[2];
+                  free_gait::JointEffortsLeg jointTorques = free_gait::JointEffortsLeg(jacobian.transpose() * contactForce_MPC.toImplementation());
+                  robot_state_->setJointEffortsForLimb(legInfo.first, jointTorques);
+                }
+                else
+                {
+                    robot_state_->setJointEffortsForLimb(legInfo.first, free_gait::JointEffortsLeg::Zero());
+                }
+              }
+            }
+            return true;
+        }
+    }
     bool RosMpcController::loadParams_MPC(const ros::NodeHandle& node_handle){
         if (node_handle.hasParam("/mpc/weights")) {
           node_handle.getParam("/mpc/weights", _MPC_WEIGHTS);

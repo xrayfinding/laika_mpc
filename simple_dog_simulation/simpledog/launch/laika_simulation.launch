@@ -10,7 +10,7 @@
 
   <arg name="x" default="0"/>
   <arg name="y" default="0"/>
-  <arg name="z" default="0.5"/>
+  <arg name="z" default="2.0"/>
   <arg name="yaw" default="0"/>
 
   <arg name="fake_pose" default="true"/>
