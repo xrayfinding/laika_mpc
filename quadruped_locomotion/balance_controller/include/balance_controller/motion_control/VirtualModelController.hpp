@@ -74,7 +74,8 @@ class VirtualModelController : public MotionControllerBase
    */
   VirtualModelController(const ros::NodeHandle& node_handle,
                          std::shared_ptr<free_gait::State> robot_state,
-                         std::shared_ptr<ContactForceDistributionBase> contactForceDistribution);
+                         std::shared_ptr<ContactForceDistributionBase> contactForceDistribution,
+                         std::shared_ptr<MPC::ConvexMpc> convexMpc);
   /*!
    * Destructor.
    */
@@ -152,10 +153,28 @@ class VirtualModelController : public MotionControllerBase
    * @return                      true if successful
    */
   virtual bool setToInterpolated(const MotionControllerBase& motionController1, const MotionControllerBase& motionController2, double t);
-
+  bool QuaternionToEuler_desired();
+  bool QuaternionToEuler();
 
  private:
   std::shared_ptr<ContactForceDistributionBase> contactForceDistribution_;
+  std::shared_ptr<MPC::ConvexMpc> convexMpc_;
+  /*
+   * following is a adapter convert datas from kindr to convexMpc
+   */
+  std::vector<double> com_position;
+  std::vector<double> com_velocity;
+  std::vector<double> com_roll_pitch_yaw;
+  std::vector<double> com_angular_velocity;
+  std::vector<int> foot_contact_states;
+  std::vector<double> foot_positions_body_frame;
+  std::vector<double> foot_friction_coeffs;
+  std::vector<double> desired_com_position;
+  std::vector<double> desired_com_velocity;
+  std::vector<double> desired_com_roll_pitch_yaw;
+  std::vector<double> desired_com_angular_velocity;
+  std::vector<double> desired_quaternion;
+  std::vector<double> quaternion;
 
   //! Base position error in base frame.
   Position positionErrorInControlFrame_;
@@ -226,7 +245,8 @@ class VirtualModelController : public MotionControllerBase
    * @return true if parameters are loaded
    */
   bool isParametersLoaded() const;
-
+  bool collections_4_mpc();
+  bool collections_4_mpc(bool ways_mit);
   void dynamicReconfigureCallback(balance_controller::balance_controllerConfig& config, uint32_t level);
 };
 

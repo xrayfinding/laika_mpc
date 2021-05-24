@@ -248,6 +248,8 @@ void RobotStateGazeboRosControlPlugin::Update()
   robot_hw_->eStopActive(e_stop_active_);
 
   // Check if we should update the controllers
+  //ROS_INFO("Update once %f", control_period_.toSec());
+
   if(sim_period >= control_period_) {
       sim_period = ros::Duration(sim_period.toSec()/real_time_factor);
     // Store this simulation time

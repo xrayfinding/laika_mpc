@@ -80,7 +80,9 @@ namespace balance_controller{
     ROS_INFO("Initializing RosBalanceController");
     //! WSHY: base balance QP controller
     contact_distribution_.reset(new ContactForceDistribution(node_handle, robot_state));
-    virtual_model_controller_.reset(new VirtualModelController(node_handle, robot_state, contact_distribution_));
+    loadParams_MPC(node_handle);
+    mpc_solver.reset(new MPC::ConvexMpc(robot_state->getRobotMass(),inertia_list_mpc,4, steps_MPC, delta_t_MPC, _MPC_WEIGHTS,torque_weight));
+    virtual_model_controller_.reset(new VirtualModelController(node_handle, robot_state, contact_distribution_,mpc_solver));
     //! WSHY: single leg controller
     single_leg_solver_.reset(new MyRobotSolver(node_handle, robot_state));
     single_leg_solver_->model_initialization();
@@ -303,7 +305,6 @@ namespace balance_controller{
     //! WSHY: get joint postions from robot state handle
     std_msgs::Int8MultiArray status_word;
     status_word.data.resize(12);
-    //std::cout<<"I want to get all joint_positions!"<<std::endl;
     for(unsigned int i=0; i<12; i++)
       {
         all_joint_positions(i) = robot_state_handle.getJointPositionRead()[i];
@@ -313,22 +314,14 @@ namespace balance_controller{
         joint_actual.velocity[i] = all_joint_velocities(i);
         joint_actual.effort[i] = all_joint_efforts(i);
         status_word.data[i] = robot_state_handle.motor_status_word_[i];
-        //std::cout<<all_joint_positions(i)<<" ";
 
       }
-    //std::cout<<"++++++++++++++++++"<<std::endl;
 
     boost::recursive_mutex::scoped_lock lock(r_mutex_);
     //! WSHY: read joint position command
     std::vector<double> & commands = *commands_buffer.readFromRT();
-     //std::cout<<"++++++++++++++++++"<<std::endl;
-//     for(int i=0;i<commands.size();i++){
-//         if(commands[i]!=0){
-//             std::cout<<commands[i]<<std::endl;
-//         }
 
 //     }
-     //std::cout<<"++++++++++++++++++"<<std::endl;
 //    LimbVector & foot_posiion_commands = *command_foot_buffer.readFromRT();
 //    LimbVector & foot_velocity_commands = *command_foot_vel_buffer.readFromRT();
 
@@ -522,7 +515,6 @@ namespace balance_controller{
 //              foot_positions.at(limb).z() -= 0.005;
 //              foot_positions.at(limb).x() += desired_velocity_in_base.x()*period.toSec();
 //              foot_positions.at(limb).y() += desired_velocity_in_base.y()*period.toSec();
-//              std::cout<<"position diff X "<<current_velocity_in_base.x()*period.toSec()<<std::endl;
 
 //              robot_state->setTargetFootPositionInBaseForLimb(Position(foot_positions.at(limb).vector()), limb);
               //            robot_state->setSurfaceNormal(limb, robot_state_->getSurfaceNormal(limb));
@@ -591,7 +583,6 @@ namespace balance_controller{
             ROS_WARN("Unspecificed Limb State");
 
           }
-//        std::cout<<"surface normal for leg "<<i<<"("<<surface_normals.at(limb)<<")"<<std::endl;
 
 //        robot_state->setSupportLeg(limb, true);
 //       RotationQuaternion base_orinetation = RotationQuaternion(robot_state_handle.getOrientation()[0],
@@ -703,11 +694,6 @@ namespace balance_controller{
             joint_command.effort[index] = joint_torque_command;
             joint_command.position[index] = commands[index];
             joint_actual.name[index] = joint_names[index];
-
-           // std::cout<<"@@@@@@@@@@@@@@  "<<joint_torque_command<<std::endl;
-//            joint_actual.position[index] = all_joint_positions(index);
-//            joint_actual.velocity[index] = all_joint_velocities(index);
-//            joint_actual.effort[index] = all_joint_efforts(index);
           }
       }
 //    joint_command_pub_.publish(joint_command);
@@ -729,18 +715,10 @@ namespace balance_controller{
 
         for(int i = 0;i<3;i++)
           {
-//MXR::NOTE:  THE Command[i] seems to be not used (set 0)
             double effort_command = computeTorqueFromPositionCommand(commands[i], i, real_time_period);
-//MXR::NOTE:  The effort_command is too large!!
-//            std::cout<<"%%%%%%%%%%%%%%%%%%%%"<<std::endl;
-//            std::cout<<"effort_command_FOR LF_LEG   "<<effort_command<<std::endl;
-//            std::cout<<"%%%%%%%%%%%%%%%%%%%%"<<std::endl;
             if(is_cartisian_motion_.at(free_gait::LimbEnum::LF_LEG) || is_footstep_.at(free_gait::LimbEnum::LF_LEG)){
               effort_command = single_leg_solver_->getVecTauAct()[i];
-//              std::cout<<"%%%%%%%%%%%%%%%%%%%%"<<std::endl;
-//              std::cout<<"effort_command_FOR LF_LEG   "<<effort_command<<std::endl;
-//              std::cout<<"%%%%%%%%%%%%%%%%%%%%"<<std::endl;
-                                                }
+            }
             else if(!is_legmode_.at(free_gait::LimbEnum::LF_LEG))
               {
                 //! WSHY: joint control mode, use Profile Position mode;
@@ -821,26 +799,14 @@ namespace balance_controller{
         free_gait::JointEffortsLeg gravity_compensation_torque = robot_state->getGravityCompensationForLimb(free_gait::LimbEnum::RH_LEG,
                                                                                 joint_position_leg,
                                                                                 gravity_in_base);
-
-//        single_leg_solver_->setvecQAct(joint_position_leg.vector(),free_gait::LimbEnum::RH_LEG);
-//        single_leg_solver_->update(time, real_time_period, free_gait::LimbEnum::RH_LEG);
-//        std::cout<<"$$$$$$$$$$$$$$$$$$$$$$$$$$"<<std::endl;
-//        std::cout<<"foot_accelerations.at(free_gait::LimbEnum::RH_LEG).vector()  "<<foot_accelerations.at(free_gait::LimbEnum::RH_LEG).vector()<<std::endl;
-//        std::cout<<"$$$$$$$$$$$$$$$$$$$$$$$$$$"<<std::endl;
         single_leg_solver_->update(time, real_time_period, free_gait::LimbEnum::RH_LEG,
                                    real_robot, foot_accelerations.at(free_gait::LimbEnum::RH_LEG).vector());
         for(int i = 0;i<3;i++)
           {
-//            std::cout<<"%%%%%%%%%%%%%%%%%%%%"<<std::endl;
-//            std::cout<<"position_command_RH   "<<commands[i]<<std::endl;
-//            std::cout<<"%%%%%%%%%%%%%%%%%%%%"<<std::endl;
             double effort_command =computeTorqueFromPositionCommand(commands[i+6], i+6, real_time_period);
             if(is_cartisian_motion_.at(free_gait::LimbEnum::RH_LEG) || is_footstep_.at(free_gait::LimbEnum::RH_LEG)){
                 //ROS_WARN("first branch!!!!!!!!!!!!!!");
               effort_command = single_leg_solver_->getVecTauAct()[i];
-//              std::cout<<"%%%%%%%%%%%%%%%%%%%%"<<std::endl;
-//              std::cout<<"effort_command_FOR RH_LEG   "<<effort_command<<std::endl;
-//              std::cout<<"%%%%%%%%%%%%%%%%%%%%"<<std::endl;
             }
             else if(!is_legmode_.at(free_gait::LimbEnum::RH_LEG))
               {
@@ -1175,11 +1141,6 @@ namespace balance_controller{
         actual_robot_state.rf_leg_mode.support_leg = real_contact_.at(free_gait::LimbEnum::RF_LEG);
         actual_robot_state.rh_leg_mode.support_leg = real_contact_.at(free_gait::LimbEnum::RH_LEG);
         actual_robot_state.lh_leg_mode.support_leg = real_contact_.at(free_gait::LimbEnum::LH_LEG);
-//        std::cout<<"real_contact_.at(free_gait::LimbEnum::LF_LEG)     "<<real_contact_.at(free_gait::LimbEnum::LF_LEG)<<std::endl;
-//        std::cout<<"real_contact_.at(free_gait::LimbEnum::RF_LEG)     "<<real_contact_.at(free_gait::LimbEnum::RF_LEG)<<std::endl;
-//        std::cout<<"real_contact_.at(free_gait::LimbEnum::RH_LEG)     "<<real_contact_.at(free_gait::LimbEnum::RH_LEG)<<std::endl;
-//        std::cout<<"real_contact_.at(free_gait::LimbEnum::LH_LEG)     "<<real_contact_.at(free_gait::LimbEnum::LH_LEG)<<std::endl;
-
         actual_robot_state.lf_leg_mode.surface_normal.vector.z = real_contact_force_.at(free_gait::LimbEnum::LF_LEG).z();
         actual_robot_state.rf_leg_mode.surface_normal.vector.z = real_contact_force_.at(free_gait::LimbEnum::RF_LEG).z();
         actual_robot_state.rh_leg_mode.surface_normal.vector.z = real_contact_force_.at(free_gait::LimbEnum::RH_LEG).z();
@@ -1247,26 +1208,6 @@ namespace balance_controller{
                                                                               robot_state_msg->base_pose.twist.twist.angular.y,
                                                                               robot_state_msg->base_pose.twist.twist.angular.z);
 
-//    Pose current_base_pose = Pose(Position(robot_state_handle.getPosition()[0],
-//                                  robot_state_handle.getPosition()[1],
-//                                  robot_state_handle.getPosition()[2]),
-//                         RotationQuaternion(robot_state_handle.getOrientation()[0],
-//                                            robot_state_handle.getOrientation()[1],
-//                                            robot_state_handle.getOrientation()[2],
-//                                            robot_state_handle.getOrientation()[3]));
-//    ROS_INFO("Desired base pose: Position: ");
-//    std::cout<<base_desired_position<<std::endl;
-//    kindr::EulerAnglesZyxPD rotation_desired(base_desired_rotation);
-//    ROS_INFO("Desired base pose: Rotation: ");
-//    std::cout<<rotation_desired<<std::endl;
-//    ROS_INFO("Current base pose: Position: ");
-//    std::cout<<current_base_pose.getPosition()<<std::endl;
-//    kindr::EulerAnglesZyxPD rotation_current(current_base_pose.getRotation());
-//    ROS_INFO("Current base pose: Rotation: ");
-//    std::cout<<rotation_current<<std::endl;
-//    ROS_INFO("Orienitaion Error is : ");
-//    std::cout<<base_desired_rotation.boxMinus(current_base_pose.getRotation())<<std::endl;
-
 //    free_gait::JointPositions all_joint_positions;
     std::vector<double> joint_commands;
     joint_commands.resize(12);
@@ -1297,7 +1238,6 @@ namespace balance_controller{
         foot_acceleration);
     foot_accelerations[free_gait::LimbEnum::LF_LEG] = Vector(foot_acceleration.toImplementation());
 
-        //std::cout<<"foot_accelerations[free_gait::LimbEnum::LF_LEG] "<<Vector(foot_acceleration.toImplementation())<<std::endl;
 
     kindr_ros::convertFromRosGeometryMsg(robot_state_msg->rf_target.target_position[0].point,
         foot_position);
@@ -1309,7 +1249,6 @@ namespace balance_controller{
         foot_acceleration);
     foot_accelerations[free_gait::LimbEnum::RF_LEG] = Vector(foot_acceleration.toImplementation());
 
-        //std::cout<<"foot_accelerations[free_gait::LimbEnum::RF_LEG] "<<Vector(foot_acceleration.toImplementation())<<std::endl;
 
     kindr_ros::convertFromRosGeometryMsg(robot_state_msg->rh_target.target_position[0].point,
         foot_position);
@@ -1320,7 +1259,6 @@ namespace balance_controller{
     kindr_ros::convertFromRosGeometryMsg(robot_state_msg->rh_target.target_acceleration[0].vector,
         foot_acceleration);
     foot_accelerations[free_gait::LimbEnum::RH_LEG] = Vector(foot_acceleration.toImplementation());
-        //std::cout<<"foot_accelerations[free_gait::LimbEnum::RH_LEG] "<<Vector(foot_acceleration.toImplementation())<<std::endl;
 
     kindr_ros::convertFromRosGeometryMsg(robot_state_msg->lh_target.target_position[0].point,
         foot_position);
@@ -1331,7 +1269,6 @@ namespace balance_controller{
     kindr_ros::convertFromRosGeometryMsg(robot_state_msg->lh_target.target_acceleration[0].vector,
         foot_acceleration);
     foot_accelerations[free_gait::LimbEnum::LH_LEG] = Vector(foot_acceleration.toImplementation());
-        //std::cout<<"foot_accelerations[free_gait::LimbEnum::LH_LEG] "<<Vector(foot_acceleration.toImplementation())<<std::endl;
 
 
 
@@ -1559,7 +1496,6 @@ namespace balance_controller{
 
       };
 
-//  std::cout<<*robot_state_<<std::endl;
 
   }
 
@@ -1574,7 +1510,6 @@ namespace balance_controller{
           {
             ROS_ERROR_ONCE("real robot coming there!!!!!!!!!!!!!!!");
             real_contact_force_.at(limb).z() = robot_state_handle.contact_pressure_[i];
-//            std::cout<<robot_state_handle.contact_pressure_[i]<<"  "<<initial_pressure[i]<<std::endl;
             if((robot_state_handle.contact_pressure_[i] - initial_pressure[i]) > contact_pressure_bias)
               {
 //                robot_state_handle.foot_contact_[i] = 1;
@@ -1585,7 +1520,6 @@ namespace balance_controller{
               }
           }
 
-//        std::cout<<i<<"     "<<real_contact_.at(limb)<<std::endl;
 
 //        if(real_robot)
 //          {
@@ -1674,17 +1608,7 @@ namespace balance_controller{
                 limbs_state.at(limb)->setState(StateSwitcher::States::StanceNormal);
                 continue;
               }
-
-//            if(!real_contact_.at(limb) && limbs_state.at(limb)->getLastState()==StateSwitcher::States::StanceNormal)
-//            {
-//                limbs_state.at(limb)->setState(StateSwitcher::States::StanceLostContact);
-//               continue;
-//            }
-
-
       }
-
-
       }
   }
   void RosBalanceController::footContactsCallback(const sim_assiants::FootContactsConstPtr& foot_contacts)
@@ -1881,8 +1805,34 @@ namespace balance_controller{
     return true;
   }
 
+
+bool RosBalanceController::loadParams_MPC(const ros::NodeHandle& node_handle){
+    if (node_handle.hasParam("/mpc/weights")) {
+      node_handle.getParam("/mpc/weights", _MPC_WEIGHTS);
+    } else {
+      ROS_ERROR("Did not find ROS parameter for robot state topic '/mpc/weights'.");
+      return false;
+    }
+    if (node_handle.hasParam("/mpc/steps_MPC")) {
+      node_handle.getParam("/mpc/steps_MPC", steps_MPC);
+    } else {
+      ROS_ERROR("Did not find ROS parameter for robot state topic '/mpc/steps_MPC'.");
+      return false;
+    }
+    if (node_handle.hasParam("/mpc/delta_t_MPC")) {
+      node_handle.getParam("/mpc/delta_t_MPC", delta_t_MPC);
+    } else {
+      ROS_ERROR("Did not find ROS parameter for robot state topic '/mpc/delta_t_MPC'.");
+      return false;
+    }
+    if (node_handle.hasParam("/mpc/torque_weight")) {
+      node_handle.getParam("/mpc/torque_weight", torque_weight);
+    } else {
+      ROS_ERROR("Did not find ROS parameter for robot state topic '/mpc/torque_weight'.");
+      return false;
+    }
+    return true;
 }
-
-
+}
 
 PLUGINLIB_EXPORT_CLASS(balance_controller::RosBalanceController, controller_interface::ControllerBase)

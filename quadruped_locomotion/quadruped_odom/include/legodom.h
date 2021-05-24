@@ -184,7 +184,7 @@ public:
     std_msgs::Float64MultiArray legodom_error_cal;
     std::string _cal_vel_way, _orientation_way, _cal_position_way, imu_topic_name_;
 
-    ros::Publisher legodom_odom_pub,legodom_error_pub,legodom_map_pub, legodom_init_pub,legPose_pub,gazebo_pub,imuvel_pub;
+    ros::Publisher legodom_odom_pub,legodom_error_pub,legodom_map_pub, legodom_init_pub,legPose_pub,gazebo_pub,imuvel_pub,rpy_pub;
 
     ros::Time init_time;
 private:

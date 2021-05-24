@@ -13,7 +13,7 @@
 #include "eigen3/Eigen/Geometry"
 #include "eigen3/Eigen/Core"
 #include "nav_msgs/Odometry.h"
-
+#include "queue"
 namespace fake_pose {
 
 class FakePose
@@ -73,7 +73,8 @@ private:
     tf::Quaternion q;
     ros::Time gazebo_time;
     double real_time_factor;
-
+    std::queue<std::vector<double>> windows_v;
+    std::vector<double> sums_v;
 };
 
 }/* namespace */

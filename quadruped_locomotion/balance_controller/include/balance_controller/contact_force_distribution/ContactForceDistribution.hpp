@@ -126,7 +126,12 @@ class ContactForceDistribution : public ContactForceDistributionBase
    */
   virtual bool computeForceDistribution(const Force& virtualForceInBaseFrame,
                                 const Torque& virtualTorqueInBaseFrame);
-
+  virtual bool computeForceDistribution(const Force& virtualForceInBaseFrame,
+      const Torque& virtualTorqueInBaseFrame,
+        std::vector<double>& _mpc);
+  virtual bool computeForceDistribution(const Force& virtualForceInBaseFrame,
+      const Torque& virtualTorqueInBaseFrame,
+        int in_2_leg);
   /*!
    * Gets the distributed net forces and torques that act on the base, i.e.
    * this force and torque are computed from the distributed contact forces and
@@ -151,6 +156,7 @@ class ContactForceDistribution : public ContactForceDistributionBase
    const LegInfo& getLegInfo(free_gait::LimbEnum leg) const;
 
    virtual bool setToInterpolated(const ContactForceDistributionBase& contactForceDistribution1, const ContactForceDistributionBase& contactForceDistribution2, double t);
+   bool calculateRfromQ(const RotationQuaternion& _q, Eigen::Matrix3d& _matR);
 
 //   const LegGroup* getLegs() const;
  private:
@@ -201,7 +207,11 @@ class ContactForceDistribution : public ContactForceDistributionBase
   std::unique_ptr<qp_solver::LinearFunctionConstraints> constraints_;
 
   ros::NodeHandle node_handle_;
-
+  //GoLaoxu: add several param for 2 leg stand
+  Eigen::VectorXd _Xb_error;
+  Eigen::VectorXd _Xb_error_last;
+  Eigen::VectorXd _Ab_error;
+  Eigen::VectorXd _Ab_error_last;
 public:
 //  std::map<LegBase*, LegInfo> legInfos_;
   std::map<free_gait::LimbEnum, LegInfo> legInfos_;
@@ -239,7 +249,9 @@ private:
   * with Jacobi transpose.
   */
   bool computeJointTorques();
+  bool computeJointTorques(std::vector<double>& _forces);
 
+  bool computeJointTorques(int leg2leg);
   bool resetOptimization();
 
   /*!

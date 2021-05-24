@@ -15,7 +15,7 @@ namespace fake_pose {
 FakePose::FakePose(ros::NodeHandle& nodehandle)
     : nodeHandle_(nodehandle)
 {
-    ROS_INFO("constructing.....");
+    ROS_ERROR("constructing.....");
 
     if(!nodehandle.getParam("/real_time_factor", real_time_factor))
       {
@@ -29,7 +29,8 @@ FakePose::FakePose(ros::NodeHandle& nodehandle)
     fakePosePub_ = nodeHandle_.advertise<geometry_msgs::PoseWithCovarianceStamped>("base_pose", 1);
     robot_state_pub_ = nodeHandle_.advertise<free_gait_msgs::RobotState>("/gazebo/robot_states", 1);
     gazebo_pub = nodeHandle_.advertise<nav_msgs::Odometry>("/gazebo/odom",1);
-
+    windows_v.empty();
+    sums_v.resize(6);
     robot_state_.lf_leg_joints.name.resize(3);
     robot_state_.lf_leg_joints.position.resize(3);
     robot_state_.lf_leg_joints.velocity.resize(3);
@@ -49,6 +50,7 @@ FakePose::FakePose(ros::NodeHandle& nodehandle)
     robot_state_.rh_leg_joints.position.resize(3);
     robot_state_.rh_leg_joints.velocity.resize(3);
     robot_state_.rh_leg_joints.effort.resize(3);
+
     //    message_filters::Subscriber<gazebo_msgs::ModelStates> timeSeqSub_(nodeHandle_,"/gazebo/model_states", 1);
 //    message_filters::TimeSequencer<gazebo_msgs::ModelStates> seq(timeSeqSub_, ros::Duration(0.1), ros::Duration(0.01),10,nodeHandle_);
 //    seq.registerCallback(&FakePose::modelStatesCallback,this);
@@ -152,6 +154,33 @@ void FakePose::modelStatesCallback(const gazebo_msgs::ModelStates::ConstPtr& mod
       base_twist.angular.x *= real_time_factor;
       base_twist.angular.y *= real_time_factor;
       base_twist.angular.z *= real_time_factor;
+      std::vector<double> vandw;
+      vandw.resize(6);
+      vandw[0] = base_twist.linear.x;
+      vandw[1] = base_twist.linear.y;
+      vandw[2] = base_twist.linear.z;
+      vandw[3] = base_twist.angular.x;
+      vandw[4] = base_twist.angular.y;
+      vandw[5] = base_twist.angular.z;
+      if(windows_v.size()<20){
+          for(int i = 0; i < 6; i++){
+              sums_v[i]+=vandw[i];
+          }
+      }else{
+          std::vector<double> tmp = windows_v.front();
+          base_twist.linear.x = sums_v[0]/windows_v.size();
+          base_twist.linear.y = sums_v[1]/windows_v.size();
+          base_twist.linear.z = sums_v[2]/windows_v.size();
+          base_twist.angular.x = sums_v[3]/windows_v.size();
+          base_twist.angular.y = sums_v[4]/windows_v.size();
+          base_twist.angular.z = sums_v[5]/windows_v.size();
+          for (int i = 0; i < 6; i++) {
+              sums_v[i]+=vandw[i];
+              sums_v[i]-=tmp[i];
+          }
+          windows_v.pop();
+      }
+      windows_v.push(vandw);
 
     fakePoseMsg_.pose.pose = base_pose;
     robot_state_.base_pose.pose = fakePoseMsg_.pose;

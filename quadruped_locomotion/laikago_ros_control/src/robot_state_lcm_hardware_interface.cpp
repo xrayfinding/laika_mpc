@@ -637,7 +637,8 @@ void RobotStateLcmHardwareInterface::write(const ros::Time &time, const ros::Dur
         }
 
         if( motiontime == 3000){
-            Kp[0] = 2.34; Kp[1] = 0.693; Kp[2] = 0.693;
+            //Kp[0] = 2.34; Kp[1] = 0.693; Kp[2] = 1.2;
+            Kp[0] = 80; Kp[1] = 50; Kp[2] = 50;
             Kv[0] = 0.02; Kv[1] = 0.02; Kv[2] = 0.02;
         }
 

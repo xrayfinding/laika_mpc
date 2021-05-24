@@ -117,10 +117,41 @@ namespace balance_controller {
     LimbFlag sw_flag, st_flag;
     LimbPhase sw_phase, st_phase;
     LimbVector foot_positions, foot_velocities, foot_accelerations, real_contact_force_, stored_foot_positions;
+    enum class CtrlEnum{
+        MIT,
+        PYBULLET,
+        YG,
+        GKD,
+    };
+    /*
+     * The cosnt parameter mpc_controller
+     */
+
+    //****************************************************
+    //roll-pitch-yaw x-y-z ang-vel vel gravity-place-holder
+    //****************************************************
+
+    std::vector<double> inertia_list_mpc = {0.07335,0,0, 0,0.25068,0, 0,0,0.25447};
+    //Golaoxu : the follor weights has been test . and it is ok.
+    //std::vector<double> _MPC_WEIGHTS = {5, 5, 0.2, 3, 3, 50, 0., 0., 1., 1., 1., 10., 0};
+    //Golaoxu : the follor weights has been test . and it is ok.
+    //std::vector<double> _MPC_WEIGHTS = {5, 10, 5, 3, 3, 50, 0., 0., 10., 1., 1., 10., 0};
+
+    //Golaoxu: in MIT's ways
+    //TODO:
+    //test:*********************************************
+    //std::vector<double> _MPC_WEIGHTS = {5, 5, 0.2, 3, 3, 30, 0., 0., 10., 1., 1., 10., 0};
+    //in mit cheetah-software
+    //std::vector<double> _MPC_WEIGHTS = {0.25, 0.25, 10, 2, 2, 20, 0., 0., 0.3, 0.2, 0.2, 0.2, 0};
+    std::vector<double> _MPC_WEIGHTS;
+    //in ros_balance_controller the weights is following and its ok
+    //std::vector<double> _MPC_WEIGHTS = {20, 20, 5, 10, 10, 100, 0., 0., 1., 1., 1., 1., 0};
+
     /**
      * @brief contact_distribution_ , pointer to contact force optimaziton
      */
     std::shared_ptr<ContactForceDistribution> contact_distribution_;
+    std::shared_ptr<MPC::ConvexMpc> mpc_solver;
     /**
      * @brief virtual_model_controller_, pointer to virtual model controller
      */
@@ -180,6 +211,41 @@ namespace balance_controller {
 
     double initial_pressure[4];
     double contact_pressure_bias;
+    /*
+     *GoLaoxu:
+     * 1. func and
+     * 2. variables
+     *  for mpc controller.
+     *
+     */
+    bool collections_4_mpc();
+    bool collections_4_mpc(bool ispybulletways);
+    bool collections_4_mpc(int is_mpc_use);
+    bool collections_4_mpc(CtrlEnum ctrl);
+    bool computeJointTorques(std::vector<double>& _forces);
+    bool computeJointTorques(std::vector<double>& _forces,CtrlEnum ways);
+    bool QuaternionToEuler_desired();
+    bool QuaternionToEuler();
+    bool loadParams_MPC(const ros::NodeHandle& node_handle);
+
+    int steps_MPC;
+    double delta_t_MPC;
+    double torque_weight;
+    std::vector<double> com_position;
+    std::vector<double> com_velocity;
+    std::vector<double> com_roll_pitch_yaw;
+    std::vector<double> com_angular_velocity;
+    std::vector<int> foot_contact_states;
+    std::vector<double> foot_positions_body_frame;
+    std::vector<double> foot_friction_coeffs;
+    std::vector<double> desired_com_position;
+    std::vector<double> desired_com_velocity;
+    std::vector<double> desired_com_roll_pitch_yaw;
+    std::vector<double> desired_com_angular_velocity;
+
+    std::vector<double> desired_quaternion;
+    std::vector<double> quaternion;
+    std::queue<vector<double>> control_steps_mpc;
 
   };
 

@@ -10,7 +10,7 @@
 
   <arg name="x" default="0"/>
   <arg name="y" default="0"/>
-  <arg name="z" default="2.0"/>
+  <arg name="z" default="0.0"/>
   <arg name="yaw" default="0"/>
 
   <arg name="fake_pose" default="true"/>
@@ -34,7 +34,7 @@
 
 
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
-    <arg name="world_name" value="$(find simpledog)/worlds/quadruped_simulation.world"/>
+    <arg name="world_name" value="$(find simpledog)/worlds/test_terrain.world"/>
     <!--<arg name="world_name" value="worlds/empty.world"/>-->
     <!-- <arg name="world_name" value="$(find simpledog)/worlds/outdoor.world"/> -->
     <arg name="paused" value="false"/>
@@ -45,7 +45,7 @@
   </include>
   <param name="/free_gait/robot_state" value="/legodom/robot_states" />
 
-  <param name="/real_time_factor" value="0.36" />
+  <param name="/real_time_factor" value="0.35" />
   <param name="/cal_fator_x" value="1.25" />
   <param name="/cal_fator_y" value="1.25" />
   <param name="/cal_fator_z" value="1.0" />
@@ -92,6 +92,7 @@
   <!-- stuff that will only be evaluated if foo is true -->
   <param name="/free_gait/robot_state" value="/gazebo/robot_states" />
   <node pkg="sim_assiants" type="pose_pub_node" name="pose_pub_node"/>
+  <node pkg="sim_assiants" type="listenQtoRPY" name="pub_RPY_ang"/>
 </group>
 <!--get the contact information from bumper sensor -->
   <node pkg="sim_assiants" type="bumper_sensor_filter_node" name="bumper_sensor_filter_node" />
@@ -102,7 +103,6 @@
   <param name="publish_frequency" type="double" value="50.0" />
   <param name="ignore_timestamp" type="bool" value="false" />
 </node>
-
 <!-- Spawn robot in gazebo (the world file has already include the robot)-->
 <!--<node name="spawn_simpledog_model" pkg="gazebo_ros" type="spawn_model"
     args="-x $(arg x)

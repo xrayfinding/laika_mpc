@@ -544,7 +544,7 @@ using namespace free_gait;
 //            if(displace_in_footprint.y()<-0.2)
 //              displace_in_footprint.y() = -0.2;
 //YG:为什么把z值设置为0.02？应该是因为足端是个球，考虑了足端半径。TODO:可以考虑改成0试一试。
-            displace_in_footprint(2) = 0.02;
+            displace_in_footprint(2) = 0.015;
             Position displace_in_baselink = displace_in_footprint;
 //            displace_in_baselink(2) = -height_+ 0.025;
 

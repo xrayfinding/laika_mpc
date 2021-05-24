@@ -102,7 +102,7 @@ bool SimRobotStateHardwareInterface::initSim(
   joint_effort_command_.resize(n_dof_);
   joint_position_command_.resize(n_dof_);
   joint_velocity_command_.resize(n_dof_);
-
+  joint_acc.resize(n_dof_);
   // Initialize values
   for(unsigned int j=0; j < n_dof_; j++)
   {
@@ -288,7 +288,8 @@ bool SimRobotStateHardwareInterface::initSim(
   // Initialize the emergency stop code.
   e_stop_active_ = false;
   last_e_stop_active_ = false;
-
+  windows_v.empty();
+  sums_v.resize(6);
   ROS_WARN("Init Gazebo hardware interface");
   return true;
 }
@@ -349,9 +350,38 @@ if(use_gazebo_feedback)
     //      robot_state_data_.linear_velocity[1],robot_state_data_.linear_velocity[2]);
 
   }
-robot_state_data_.angular_velocity[0] = real_time_factor * base_link_ptr_->GetWorldAngularVel().x;
-robot_state_data_.angular_velocity[1] = real_time_factor * base_link_ptr_->GetWorldAngularVel().y;
-robot_state_data_.angular_velocity[2] = real_time_factor * base_link_ptr_->GetWorldAngularVel().z;
+    robot_state_data_.angular_velocity[0] = real_time_factor * base_link_ptr_->GetWorldAngularVel().x;
+    robot_state_data_.angular_velocity[1] = real_time_factor * base_link_ptr_->GetWorldAngularVel().y;
+    robot_state_data_.angular_velocity[2] = real_time_factor * base_link_ptr_->GetWorldAngularVel().z;
+//    std::vector<double> vandw;
+//    vandw.resize(6);
+//    vandw[0] = robot_state_data_.linear_velocity[0];
+//    vandw[1] = robot_state_data_.linear_velocity[1];
+//    vandw[2] = robot_state_data_.linear_velocity[2];
+//    vandw[3] = robot_state_data_.angular_velocity[0];
+//    vandw[4] = robot_state_data_.angular_velocity[1];
+//    vandw[5] = robot_state_data_.angular_velocity[2];
+//    //std::cout << robot_state_data_.linear_velocity[2] << "   --   ";
+//    if(windows_v.size()<20){
+//        for(int i = 0; i < 6; i++){
+//            sums_v[i]+=vandw[i];
+//        }
+//    }else{
+//        std::vector<double> tmp = windows_v.front();
+//        robot_state_data_.linear_velocity[0] = sums_v[0]/20.0;
+//        robot_state_data_.linear_velocity[1] = sums_v[1]/20.0;
+//        robot_state_data_.linear_velocity[2] = sums_v[2]/20.0;
+//         robot_state_data_.angular_velocity[0] = sums_v[3]/20.0;
+//         robot_state_data_.angular_velocity[1] = sums_v[4]/20.0;
+//         robot_state_data_.angular_velocity[2] = sums_v[5]/20.0;
+//        for (int i = 0; i < 6; i++) {
+//            sums_v[i]+=vandw[i];
+//            sums_v[i]-=tmp[i];
+//        }
+//        //std::cout << robot_state_data_.linear_velocity[2] << std::endl;
+//        windows_v.pop();
+//    }
+//    windows_v.push(vandw);
 /****************
 * TODO(Shunyao) : update Imu data
 ****************/
@@ -408,10 +438,10 @@ void SimRobotStateHardwareInterface::writeSim(ros::Time time, ros::Duration peri
           double effort = e_stop_active_ ? 0 : joint_effort_command_[j];
           //std::cout<<j<<"  "<<joint_effort_command_[j]<<std::endl;
 //          effort = effort + 5*(rand() / double(RAND_MAX) -0.5);
-//          if(effort >= 100)
-//            effort = 100;
-//          if(effort<= -100)
-//            effort = -100;
+          if(effort >= 60)
+            effort = 60;
+          if(effort<= -60)
+            effort = -60;
           sim_joints_[j]->SetForce(0, effort);
         }
         break;

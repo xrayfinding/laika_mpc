@@ -405,29 +405,6 @@ int main(int argc, char *argv[])
     ros::init(argc, argv, "action_server_test");
     ros::NodeHandle nh("~");
     ActionServerTest ac_test(nh);
-//    pause_service_server = nh.advertiseService("/free_gait/pause_execution_service", &ActionServerTest::PauseServiceCallback, &ac_test);
-
     ros::spin();
-//    pluginlib::ClassLoader<AdapterBase> adapter_loader("free_gait_ros", "free_gait::AdapterBase");
-//    std::unique_ptr<AdapterBase> adapter;
-//    adapter.reset(adapter_loader.createUnmanagedInstance("free_gait_ros/AdapterDummy"));
-
-
-//    double dt = 0.001;
-//    double time = 0.0;
-////    ros::Time t_start = ros::Time::now();
-//    ros::Rate rate(1000);
-//    ros::spin();
-
-//        while (!executor.getQueue().empty()) {
-//          executor.advance(dt, true);
-//          time = time + dt;
-//          rosPublisher.publish(adapter->getState());
-
-//        }
-
-//    ros::Time t_end = ros::Time::now();
-//    cout<<"end time : "<<time<<endl;
-//    cout<<"Real time costs is : "<<t_end-t_start<<endl;
     return 0;
 }

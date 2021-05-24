@@ -51,9 +51,11 @@ namespace balance_controller {
 
 VirtualModelController::VirtualModelController(const ros::NodeHandle& node_handle,
                                                std::shared_ptr<free_gait::State> robot_state,
-                                               std::shared_ptr<ContactForceDistributionBase> contactForceDistribution)
+                                               std::shared_ptr<ContactForceDistributionBase> contactForceDistribution,
+                                               std::shared_ptr<MPC::ConvexMpc> convexMpc)
     : MotionControllerBase(node_handle, robot_state),
       contactForceDistribution_(contactForceDistribution),
+      convexMpc_(convexMpc),
       gravityCompensationForcePercentage_(1.0)
 {
 
@@ -124,18 +126,94 @@ bool VirtualModelController::addToLogger()
  */
 bool VirtualModelController::compute()
 {
-  if (!isParametersLoaded()) return false;
+//  if (!isParametersLoaded()) return false;
 
-  computeError();
-  computeGravityCompensation();
-  computeVirtualForce();
-  computeVirtualTorque();
-//  cout << *this << endl;
-  if (!contactForceDistribution_->computeForceDistribution(virtualForceInBaseFrame_, virtualTorqueInBaseFrame_)) {
-    return false;
-  }
+//  computeError();
+//  computeGravityCompensation();
+//  computeVirtualForce();
+//  computeVirtualTorque();
+//  if (!contactForceDistribution_->computeForceDistribution(virtualForceInBaseFrame_, virtualTorqueInBaseFrame_)) {
+//    return false;
+//  }
+
+  /*
+   *GoLaoxu:if follow codes are executed, the force that we used is caculated by MPC(sigle rigid body).
+   *
+   */
+//  Position footpos = robot_state_->getPositionBaseToFootInBaseFrame(free_gait::LimbEnum::LF_LEG);
+  collections_4_mpc(true);
+  vector<double> mpc_ans =  convexMpc_->ComputeContactForces(com_position, com_velocity, com_roll_pitch_yaw, com_angular_velocity,
+                                   foot_contact_states,foot_positions_body_frame ,foot_friction_coeffs,
+                                   desired_com_position, desired_com_velocity, desired_com_roll_pitch_yaw,desired_com_angular_velocity);
+  vector<double> mpc_use(mpc_ans.begin(), mpc_ans.begin()+12);
+    if (!contactForceDistribution_->computeForceDistribution(virtualForceInBaseFrame_, virtualTorqueInBaseFrame_, mpc_use)) {
+      return false;
+    }
   return true;
 }
+
+bool VirtualModelController::QuaternionToEuler_desired(){
+    vector<double> euler;
+    euler.resize(3);
+    const double Epsilon = 0.0009765625f;
+        const double Threshold = 0.5f - Epsilon;
+
+        double TEST = desired_quaternion[3] * desired_quaternion[1] - desired_quaternion[0] * desired_quaternion[2];
+
+        if (TEST < -Threshold || TEST > Threshold) // 奇异姿态,俯仰角为±90°
+        {
+            int sign = 1;
+            if(TEST <= -1e-7){
+                sign = -1;
+            }
+            euler[2] = -2 * sign * (double)atan2(desired_quaternion[0], desired_quaternion[3]); // yaw
+
+            euler[1] = sign * (EIGEN_PI / 2.0); // pitch
+
+            euler[0] = 0; // roll
+
+        }
+        else
+        {
+            euler[0] = atan2(2 * (desired_quaternion[1]*desired_quaternion[2] + desired_quaternion[3]*desired_quaternion[0]), desired_quaternion[3]*desired_quaternion[3] - desired_quaternion[0]*desired_quaternion[0] - desired_quaternion[1]*desired_quaternion[1] + desired_quaternion[2]*desired_quaternion[2]);
+            euler[1] = asin(-2 * (desired_quaternion[0]*desired_quaternion[2] - desired_quaternion[3]*desired_quaternion[1]));
+            euler[2] = atan2(2 * (desired_quaternion[0]*desired_quaternion[1] + desired_quaternion[3]*desired_quaternion[2]), desired_quaternion[3]*desired_quaternion[3] + desired_quaternion[0]*desired_quaternion[0] - desired_quaternion[1]*desired_quaternion[1] - desired_quaternion[2]*desired_quaternion[2]);
+        }
+        desired_com_roll_pitch_yaw.assign(euler.begin(), euler.end());
+        return true;
+}
+
+bool VirtualModelController::QuaternionToEuler(){
+    vector<double> euler;
+    euler.resize(3);
+    const double Epsilon = 0.0009765625f;
+        const double Threshold = 0.5f - Epsilon;
+
+        double TEST = quaternion[3] * quaternion[1] - quaternion[0] * quaternion[2];
+
+        if (TEST < -Threshold || TEST > Threshold) // 奇异姿态,俯仰角为±90°
+        {
+            int sign = 1;
+            if(TEST <= -1e-7){
+                sign = -1;
+            }
+            euler[2] = -2 * sign * (double)atan2(desired_quaternion[0], desired_quaternion[3]); // yaw
+
+            euler[1] = sign * (EIGEN_PI / 2.0); // pitch
+
+            euler[0] = 0; // roll
+
+        }
+        else
+        {
+            euler[0] = atan2(2 * (quaternion[1]*quaternion[2] + quaternion[3]*quaternion[0]), quaternion[3]*quaternion[3] - quaternion[0]*quaternion[0] - quaternion[1]*quaternion[1] + quaternion[2]*quaternion[2]);
+            euler[1] = asin(-2 * (quaternion[0]*quaternion[2] - quaternion[3]*quaternion[1]));
+            euler[2] = atan2(2 * (quaternion[0]*quaternion[1] + quaternion[3]*quaternion[2]), quaternion[3]*quaternion[3] + quaternion[0]*quaternion[0] - quaternion[1]*quaternion[1] - quaternion[2]*quaternion[2]);
+        }
+        com_roll_pitch_yaw.assign(euler.begin(), euler.end());
+        return true;
+}
+
 
 bool VirtualModelController::computeError()
 {
@@ -180,35 +258,11 @@ bool VirtualModelController::computeError()
 //      torso_->getMeasuredState().getWorldToBaseOrientationInWorldFrame());
 
 
-
-
-//  std::cout << "ornt error: " << orientationError_.transpose() << std::endl;
-
-//  std::cout << "***///******" << std::endl;
-//  std::cout << "des orientation: " << orientationControlToBase << std::endl;
-//  std::cout << "meas orientation: " << robot_state_->getOrientationBaseToWorld().inverted() << std::endl;
-//  std::cout << "test: " << test << std::endl;
-//  std::cout << "orientationError_: " << orientationError_ << std::endl;
-//  std::cout << "***///******" << std::endl << std::endl;
-
-
   linearVelocityErrorInControlFrame_ = robot_state_->getTargetLinearVelocityBaseInWorldFrame()
       - robot_state_->getLinearVelocityBaseInWorldFrame();//orientationControlToBase.inverseRotate(robot_state_->getLinearVelocityBaseInWorldFrame());//torso_->getDesiredState().getLinearVelocityBaseInControlFrame() - orientationControlToBase.inverseRotate(torso_->getMeasuredState().getLinearVelocityBaseInBaseFrame());
   angularVelocityErrorInControlFrame_ = robot_state_->getTargetAngularVelocityBaseInBaseFrame()
       -robot_state_->getAngularVelocityBaseInBaseFrame();//torso_->getDesiredState().getAngularVelocityBaseInControlFrame() - orientationControlToBase.inverseRotate(torso_->getMeasuredState().getAngularVelocityBaseInBaseFrame());
-
-//  std::cout<<'============================='<<std::endl;
-//  std::cout << "position: " << positionErrorInControlFrame_
-//            << "orientation: " << orientationError_<< std::endl;
-//  std::cout << "linearVelocity: " << linearVelocityErrorInControlFrame_
-//            << "angularVelocity: " << angularVelocityErrorInControlFrame_<< std::endl;
-//  std::cout<<'============================='<<std::endl;
-//  std::cout<<std::endl;
-//            std::cout<< "des lin vel: " << robot_state_->getTargetLinearVelocityBaseInWorldFrame()
-//            << "meas lin vel: " << robot_state_->getLinearVelocityBaseInWorldFrame() << std::endl;
-
-//  std::cout << "des torso pos: " << torso_->getDesiredState().getPositionControlToBaseInControlFrame() << std::endl;
-  return true;
+ return true;
 }
 
 bool VirtualModelController::computeGravityCompensation()
@@ -296,15 +350,6 @@ bool VirtualModelController::computeVirtualForce()
                        + gravityCompensationFeedbackInBaseFrame
                        + gravityDampingCompensationFeedbackInBaseFrame;
 
-//  std::cout << "--------------------" << std::endl;
-//  std::cout << "虚拟力: "<<virtualForceInBaseFrame_<< std::endl;
-//  std::cout << "--------------------" << std::endl;
-
-//  std::cout << "proportional: " << orientationControlToBase.rotate(Force(proportionalGainTranslation_.cwiseProduct(positionErrorInControlFrame_.toImplementation()))) << std::endl;
-//  std::cout << "derivative: " << orientationControlToBase.rotate(Force(derivativeGainTranslation_.cwiseProduct(linearVelocityErrorInControlFrame_.toImplementation()))) << std::endl;
-//  std::cout << "ff: " << orientationControlToBase.rotate(Force(feedforwardGainTranslation_.cwiseProduct(feedforwardTermInControlFrame))) << std::endl;
-//  std::cout << "virtual force in base frame: " << virtualForceInBaseFrame_ << std::endl;
-
   return true;
 }
 
@@ -316,7 +361,6 @@ bool VirtualModelController::computeVirtualTorque()
   Vector3d feedforwardTermInControlFrame = Vector3d::Zero();
   feedforwardTermInControlFrame.z() += robot_state_->getTargetAngularVelocityBaseInBaseFrame().z();//torso_->getDesiredState().getAngularVelocityBaseInControlFrame().z();
 
-//  std::cout << "proportionalGainRotation: " << proportionalGainRotation_.transpose() << std::endl;
 
 //  virtualTorqueInBaseFrame_ = Torque(proportionalGainRotation_.cwiseProduct(orientationError_))
 //                       + orientationControlToBase.rotate(Torque(derivativeGainRotation_.cwiseProduct(angularVelocityErrorInControlFrame_.toImplementation())))
@@ -339,19 +383,282 @@ bool VirtualModelController::computeVirtualTorque()
                        +orientationControlToBase.rotate(Torque(feedforwardGainRotation_.cwiseProduct(feedforwardTermInControlFrame)))
                        + gravityCompensationTorqueInBaseFrame_;
 
-
-  //std::cout<<"Torque(proportionalGainRotation_.cwiseProduct(orientationError_)) "<<Torque(proportionalGainRotation_.cwiseProduct(orientationError_))<<std::endl;
-  //std::cout<<"orientationControlToBase.rotate(Torque(derivativeGainRotation_.cwiseProduct(angularVelocityErrorInControlFrame_.toImplementation())))"<<orientationControlToBase.rotate(Torque(derivativeGainRotation_.cwiseProduct(angularVelocityErrorInControlFrame_.toImplementation())))<<std::endl;
-//    std::cout << "--------------------" << std::endl;
-//    std::cout << "虚拟力矩: "<<virtualTorqueInBaseFrame_<< std::endl;
-//    std::cout << "--------------------" << std::endl;
-//  std::cout << "--------------------" << std::endl;
-//      << "ornt err: " << Torque(proportionalGainRotation_.cwiseProduct(orientationError_)) << std::endl
-//      << "derivative err: " << orientationControlToBase.rotate(Torque(derivativeGainRotation_.cwiseProduct(angularVelocityErrorInControlFrame_.toImplementation()))) << std::endl
-//      << "ff: " << orientationControlToBase.rotate(Torque(feedforwardGainRotation_.cwiseProduct(feedforwardTermInControlFrame))) << std::endl
-//      << "grav comp: " << gravityCompensationTorqueInBaseFrame_ << std::endl;
-
   return true;
+}
+
+
+bool VirtualModelController::collections_4_mpc(){
+    //1.com_position
+    Position _com_position = robot_state_->getPositionWorldToBaseInWorldFrame();
+    com_position.resize(3);
+    com_position[0] = _com_position.x();
+    com_position[1] = _com_position.y();
+    com_position[2] = _com_position.z();
+    //2.com_velocity
+    LinearVelocity _com_velocity = robot_state_->getLinearVelocityBaseInWorldFrame();
+    com_velocity.resize(3);
+    com_velocity[0] = _com_velocity.x();
+    com_velocity[1] = _com_velocity.y();
+    com_velocity[2] = _com_velocity.z();
+    //3.rpy
+    com_roll_pitch_yaw.resize(3);
+    RotationQuaternion _rotation_orien= robot_state_->getOrientationBaseToWorld();
+    quaternion.resize(4);
+    quaternion[0] = _rotation_orien.x();
+    quaternion[1] = _rotation_orien.y();
+    quaternion[2] = _rotation_orien.z();
+    quaternion[3] = _rotation_orien.w();
+    QuaternionToEuler();
+    //don't consider the yaw angel
+//    com_roll_pitch_yaw[2] = 0;
+    //4.ang_vel
+    LocalAngularVelocity _com_angular_velocity = robot_state_->getAngularVelocityBaseInBaseFrame();
+    com_angular_velocity.resize(3);
+    com_angular_velocity[0] = _com_angular_velocity.x();
+    com_angular_velocity[1] = _com_angular_velocity.y();
+    com_angular_velocity[2] = _com_angular_velocity.z();
+    //5.contact_states
+    foot_contact_states.resize(4);
+    for (const auto& leg : limbs_){
+        int _n;
+        switch (leg) {
+            case free_gait::LimbEnum::LF_LEG:
+                _n = 0;
+                break;
+            case free_gait::LimbEnum::RF_LEG:
+                _n = 1;
+                break;
+            case free_gait::LimbEnum::RH_LEG:
+                _n = 2;
+                break;
+            case free_gait::LimbEnum::LH_LEG:
+                _n = 3;
+                break;
+            default:
+                ROS_ERROR("no leg be chosen");
+        }
+        if(robot_state_->isSupportLeg(leg)){
+            foot_contact_states[_n] = 1;
+        }
+        else{
+            foot_contact_states[_n] = 0;
+        }
+    }
+    //6.foot_postion
+    foot_positions_body_frame.resize(12);
+    for(const auto& leg: limbs_){
+        int _n;
+        switch (leg) {
+            case free_gait::LimbEnum::LF_LEG:
+                _n = 0;
+                break;
+            case free_gait::LimbEnum::RF_LEG:
+                _n = 1;
+                break;
+            case free_gait::LimbEnum::RH_LEG:
+                _n = 2;
+                break;
+            case free_gait::LimbEnum::LH_LEG:
+                _n = 3;
+                break;
+            default:
+                ROS_ERROR("no leg be chosen");
+        }
+        Position footpos = robot_state_->getPositionBaseToFootInBaseFrame(leg);
+        foot_positions_body_frame[_n * 3]  = footpos.x();
+        foot_positions_body_frame[_n * 3 + 1]  = footpos.y();
+        foot_positions_body_frame[_n * 3 + 2]  = footpos.z();
+    }
+    //7.frition_coeffs
+    foot_friction_coeffs = {0.45, 0.45, 0.45, 0.45};
+    //8.desire_pos
+    Position _desired_com_position = robot_state_->getTargetPositionWorldToBaseInWorldFrame();
+    desired_com_position.resize(3);
+    desired_com_position[0] = _desired_com_position.x();
+    desired_com_position[1] = _desired_com_position.y();
+    desired_com_position[2] = _desired_com_position.z();
+    //9.desire_vel
+    LinearVelocity _desired_com_velocity = robot_state_->getTargetLinearVelocityBaseInWorldFrame();
+    desired_com_velocity.resize(3);
+    desired_com_velocity[0] = _desired_com_velocity.x();
+    desired_com_velocity[1] = _desired_com_velocity.y();
+    desired_com_velocity[2] = _desired_com_velocity.z();
+    //10.desire_rpy
+    _rotation_orien = robot_state_->getTargetOrientationBaseToWorld();
+    desired_quaternion.resize(4);
+    desired_quaternion[0] = _rotation_orien.x();
+    desired_quaternion[1] = _rotation_orien.y();
+    desired_quaternion[2] = _rotation_orien.z();
+    desired_quaternion[3] = _rotation_orien.w();
+    desired_com_roll_pitch_yaw.resize(3);
+    QuaternionToEuler_desired();
+    //11.desire_ang_vel
+    LocalAngularVelocity _desired_com_angular_velocity = robot_state_->getTargetAngularVelocityBaseInBaseFrame();
+    desired_com_angular_velocity.resize(3);
+    desired_com_angular_velocity[0] = _desired_com_angular_velocity.x();
+    desired_com_angular_velocity[1] = _desired_com_angular_velocity.y();
+    desired_com_angular_velocity[2] = _desired_com_angular_velocity.z();
+}
+
+bool VirtualModelController::collections_4_mpc(bool ways_mit){
+    if(!ways_mit){
+        return false;
+    }
+    const RotationQuaternion& orientationControlToBase = robot_state_->getOrientationBaseToWorld().inverted();//torso_->getMeasuredState().getOrientationControlToBase();
+    const RotationQuaternion& orientationWorldToBase = robot_state_->getOrientationBaseToWorld().inverted();//torso_->getMeasuredState().getOrientationWorldToBase();
+    const RotationQuaternion& orientationWorldToControl = orientationWorldToBase*orientationControlToBase.inverted();//robot_state_->getTargetOrientationBaseToWorld();//torso_->getMeasuredState().getOrientationWorldToControl();
+
+    //1.com_position
+    Position _com_position = robot_state_->getPositionWorldToBaseInWorldFrame();
+    com_position.resize(3);
+    com_position[0] = _com_position.x();
+    com_position[1] = _com_position.y();
+    com_position[2] = _com_position.z();
+
+    com_position[0] = 0.0;
+    com_position[1] = 0.0;
+
+    //2.com_velocity
+    LinearVelocity _com_velocity = robot_state_->getLinearVelocityBaseInWorldFrame();
+    com_velocity.resize(3);
+    com_velocity[0] = _com_velocity.x();
+    com_velocity[1] = _com_velocity.y();
+    com_velocity[2] = _com_velocity.z();
+    //3.rpy
+    com_roll_pitch_yaw.resize(3);
+    RotationQuaternion _rotation_orien= robot_state_->getOrientationBaseToWorld();
+    quaternion.resize(4);
+    quaternion[0] = _rotation_orien.x();
+    quaternion[1] = _rotation_orien.y();
+    quaternion[2] = _rotation_orien.z();
+    quaternion[3] = _rotation_orien.w();
+    QuaternionToEuler();
+
+    //don't consider the yaw angel
+    com_roll_pitch_yaw[2] = 0;
+    //4.ang_vel
+
+
+   // LocalAngularVelocity _com_angular_velocity =  robot_state_->getAngularVelocityBaseInBaseFrame();
+
+    LocalAngularVelocity _com_angular_velocity =  orientationControlToBase.rotate(robot_state_->getAngularVelocityBaseInBaseFrame());
+    com_angular_velocity.resize(3);
+    com_angular_velocity[0] = _com_angular_velocity.x();
+    com_angular_velocity[1] = _com_angular_velocity.y();
+    com_angular_velocity[2] = _com_angular_velocity.z();
+    //5.contact_states
+    foot_contact_states.resize(4);
+    for (const auto& leg : limbs_){
+        int _n;
+        switch (leg) {
+            case free_gait::LimbEnum::LF_LEG:
+                _n = 0;
+                break;
+            case free_gait::LimbEnum::RF_LEG:
+                _n = 1;
+                break;
+            case free_gait::LimbEnum::RH_LEG:
+                _n = 2;
+                break;
+            case free_gait::LimbEnum::LH_LEG:
+                _n = 3;
+                break;
+            default:
+                ROS_ERROR("no leg be chosen");
+        }
+        if(robot_state_->isSupportLeg(leg)){
+            foot_contact_states[_n] = 1;
+        }
+        else{
+            foot_contact_states[_n] = 0;
+        }
+    }
+    //6.foot_postion
+    foot_positions_body_frame.resize(12);
+    for(const auto& leg: limbs_){
+        int _n;
+        switch (leg) {
+            case free_gait::LimbEnum::LF_LEG:
+                _n = 0;
+                break;
+            case free_gait::LimbEnum::RF_LEG:
+                _n = 1;
+                break;
+            case free_gait::LimbEnum::RH_LEG:
+                _n = 2;
+                break;
+            case free_gait::LimbEnum::LH_LEG:
+                _n = 3;
+                break;
+            default:
+                ROS_ERROR("no leg be chosen");
+        }
+        Position footpos = robot_state_->getPositionBaseToFootInBaseFrame(leg);
+        foot_positions_body_frame[_n * 3]  = footpos.x();
+        foot_positions_body_frame[_n * 3 + 1]  = footpos.y();
+        foot_positions_body_frame[_n * 3 + 2]  = footpos.z();
+    }
+//    std::cout << "Real foot position: " << foot_positions_body_frame[0] <<" " <<
+//                 foot_positions_body_frame[1]<<" "<<
+//                 foot_positions_body_frame[2]<< endl;
+    //7.frition_coeffs
+    foot_friction_coeffs = {0.45, 0.45, 0.45, 0.45};
+    //8.desire_pos
+    Position _desired_com_position = robot_state_->getTargetPositionWorldToBaseInWorldFrame();
+    desired_com_position.resize(3);
+    desired_com_position[0] = _desired_com_position.x();
+    desired_com_position[1] = _desired_com_position.y();
+    desired_com_position[2] = _desired_com_position.z();
+
+    desired_com_position[0] = 0.0;
+    desired_com_position[1] = 0.0;
+    //0319
+    desired_com_position[2] = _desired_com_position.z();
+
+    //9.desire_vel
+    LinearVelocity _desired_com_velocity = robot_state_->getTargetLinearVelocityBaseInWorldFrame();
+    desired_com_velocity.resize(3);
+    desired_com_velocity[0] = _desired_com_velocity.x();
+    desired_com_velocity[1] = _desired_com_velocity.y();
+    desired_com_velocity[2] = _desired_com_velocity.z();
+    desired_com_velocity[2] = 0.0;
+
+    //0319
+    desired_com_velocity[0] = 0;
+    desired_com_velocity[1] = 0;
+    desired_com_velocity[2] = 0;
+
+    //10.desire_rpy
+    _rotation_orien = robot_state_->getTargetOrientationBaseToWorld();
+    desired_quaternion.resize(4);
+    desired_quaternion[0] = _rotation_orien.x();
+    desired_quaternion[1] = _rotation_orien.y();
+    desired_quaternion[2] = _rotation_orien.z();
+    desired_quaternion[3] = _rotation_orien.w();
+    desired_com_roll_pitch_yaw.resize(3);
+    QuaternionToEuler_desired();
+//    std::cout << "desired rpy " <<
+//                 desired_com_roll_pitch_yaw[2] << " "<< std::endl;
+    desired_com_roll_pitch_yaw[0] = 0.0;
+    desired_com_roll_pitch_yaw[1] = 0.0;
+    desired_com_roll_pitch_yaw[2] = 0.0;
+
+//    std::cout << " rpy " <<
+//                 com_roll_pitch_yaw[2] << " "<< std::endl;
+
+    //11.desire_ang_vel
+    LocalAngularVelocity _desired_com_angular_velocity = robot_state_->getTargetAngularVelocityBaseInBaseFrame();
+    desired_com_angular_velocity.resize(3);
+    desired_com_angular_velocity[0] = _desired_com_angular_velocity.x();
+    desired_com_angular_velocity[1] = _desired_com_angular_velocity.y();
+    desired_com_angular_velocity[2] = _desired_com_angular_velocity.z();
+    desired_com_angular_velocity[0] = 0.0;
+    desired_com_angular_velocity[1] = 0.0;
+    //0319
+    //Golaoxu : this has great influence of mpc controller
+    desired_com_angular_velocity[2] = 0.0;
+
+    return  true;
 }
 
 

@@ -50,7 +50,7 @@ QuadrupedEstimation::QuadrupedEstimation(const ros::NodeHandle& _nodehandle,
     legPose_pub = nodeHandle_.advertise<geometry_msgs::PoseWithCovarianceStamped>("/legodom/base_pose", 10);
 
     imuvel_pub = nodeHandle_.advertise<geometry_msgs::Twist>("/imu_vel",10);
-
+    rpy_pub = nodeHandle_.advertise<geometry_msgs::Vector3>("/rpy_ang",10);
 
 }
 

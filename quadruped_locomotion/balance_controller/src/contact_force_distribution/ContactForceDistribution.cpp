@@ -134,6 +134,94 @@ bool ContactForceDistribution::computeForceDistribution(
   return isForceDistributionComputed_;
 }
 
+
+bool ContactForceDistribution::computeForceDistribution( const Force& virtualForceInBaseFrame,
+    const Torque& virtualTorqueInBaseFrame,
+    std::vector<double>& force_from_mpc)
+{
+
+  if(!checkIfParametersLoaded()) return false;
+
+  resetOptimization();//! WSHY: reset leg contact force and object function parameters
+  prepareLegLoading();
+
+  if (nLegsInForceDistribution_ > 0)
+  {
+      //! WSHY: calculate A, b, S, W
+    prepareOptimization(virtualForceInBaseFrame, virtualTorqueInBaseFrame);
+
+    // TODO Move these function calls to a separate method which can be overwritten
+    // to have different contact force distributions, or let them be activated via parameters.
+    addMinimalForceConstraints();
+    addFrictionConstraints();
+
+    // Has to be called as last
+    addDesiredLegLoadConstraints();
+    isForceDistributionComputed_ = solveOptimization();
+//    for (auto& legInfo : legInfos_)
+//    {
+
+//      /*
+//       * Torque setpoints should be updated only is leg is support leg.
+//       */
+//      if  (robot_state_->isSupportLeg(legInfo.first)) {
+
+//        if (legInfo.second.isPartOfForceDistribution_)
+//        {
+//          Force contactForce = legInfo.second.desiredContactForce_;//! WSHY: TODO tranform to hip frame
+//          ROS_INFO("contact force for %d is : \n", static_cast<int>(legInfo.first));
+//          std::cout<<contactForce.toImplementation()<<std::endl;
+//        }
+//      }
+//    }
+    if (isForceDistributionComputed_)
+    {
+      computeJointTorques(force_from_mpc);
+    }
+  }
+  else
+  {
+    // No leg is part of the force distribution
+    isForceDistributionComputed_ = true;
+    computeJointTorques();
+  }
+
+  if (isLogging_) updateLoggerData();
+  return isForceDistributionComputed_;
+}
+bool ContactForceDistribution::computeForceDistribution(const Force& virtualForceInBaseFrame,
+    const Torque& virtualTorqueInBaseFrame,
+                                                        int in_2_leg){
+    if(!checkIfParametersLoaded()) return false;
+    resetOptimization();//! WSHY: reset leg contact force and object function parameters
+    prepareLegLoading();
+    if (nLegsInForceDistribution_ > 0)
+    {
+        //! WSHY: calculate A, b, S, W
+      prepareOptimization(virtualForceInBaseFrame, virtualTorqueInBaseFrame);
+      // TODO Move these function calls to a separate method which can be overwritten
+      // to have different contact force distributions, or let them be activated via parameters.
+      addMinimalForceConstraints();
+      addFrictionConstraints();
+      // Has to be called as last
+      addDesiredLegLoadConstraints();
+      isForceDistributionComputed_ = solveOptimization();
+      if (isForceDistributionComputed_)
+      {
+        computeJointTorques(in_2_leg);
+      }
+    }
+    else
+    {
+      // No leg is part of the force distribution
+      isForceDistributionComputed_ = true;
+      computeJointTorques();
+    }
+
+    if (isLogging_) updateLoggerData();
+    return isForceDistributionComputed_;
+}
+
 bool ContactForceDistribution::prepareLegLoading()
 {
   nLegsInForceDistribution_ = 0;
@@ -614,6 +702,220 @@ bool ContactForceDistribution::computeJointTorques()
   return true;
 }
 
+
+bool ContactForceDistribution::computeJointTorques(std::vector<double>& _forces){
+    const LinearAcceleration gravitationalAccelerationInWorldFrame = LinearAcceleration(0.0,0.0,-9.8);//torso_->getProperties().getGravity();
+    const LinearAcceleration gravitationalAccelerationInBaseFrame = robot_state_->getOrientationBaseToWorld().inverseRotate(gravitationalAccelerationInWorldFrame);//torso_->getMeasuredState().getOrientationWorldToBase().rotate(gravitationalAccelerationInWorldFrame);
+
+  //  const int nDofPerLeg = 3; // TODO move to robot commons
+  //  const int nDofPerContactPoint = 3; // TODO move to robot commons
+
+    for (auto& legInfo : legInfos_)
+    {
+
+      /*
+       * Torque setpoints should be updated only is leg is support leg.
+       */
+      if  (robot_state_->isSupportLeg(legInfo.first)) {
+
+        if (legInfo.second.isPartOfForceDistribution_)
+        {
+          Eigen::Matrix3d jacobian = robot_state_->getTranslationJacobianFromBaseToFootInBaseFrame(legInfo.first);
+          Force contactForce = legInfo.second.desiredContactForce_;//! WSHY: TODO tranform to hip frame
+          int n_leg = static_cast<int>(legInfo.first);
+          std::vector<double> _f;
+          _f.resize(3);
+          for (int i = 0; i < 3; i++) {
+              _f[i] = _forces[i + 3*n_leg];
+          }
+          //Eigen::Vector3d force_mpc;
+          Force contactForce_MPC;
+          contactForce_MPC << _f[0], _f[1], _f[2];
+  //        ROS_INFO("contact force for %d is : \n", static_cast<int>(legInfo.first));
+  //        std::cout<<contactForce.toImplementation()<<std::endl;
+          Position tranformed_vector = robot_state_->getPositionFootToHipInHipFrame(legInfo.first, Position(contactForce_MPC.toImplementation()));
+          ROS_DEBUG("leg Jacobian for %d is : \n", static_cast<int>(legInfo.first));
+          free_gait::JointEffortsLeg jointTorques = free_gait::JointEffortsLeg(jacobian.transpose() * contactForce_MPC.toImplementation());
+          free_gait::JointPositionsLeg joint_position_leg = robot_state_->getJointPositionFeedbackForLimb(legInfo.first);
+          jointTorques += robot_state_->getGravityCompensationForLimb(legInfo.first, joint_position_leg, free_gait::Force(gravitationalAccelerationInBaseFrame.toImplementation()));
+          robot_state_->setJointEffortsForLimb(legInfo.first, jointTorques);
+        }
+        else
+        {
+            robot_state_->setJointEffortsForLimb(legInfo.first, free_gait::JointEffortsLeg::Zero());
+        }
+      }
+    }
+    return true;
+}
+
+bool ContactForceDistribution::computeJointTorques(int leg2leg){
+    const LinearAcceleration gravitationalAccelerationInWorldFrame = LinearAcceleration(0.0,0.0,-9.8);//torso_->getProperties().getGravity();
+    const LinearAcceleration gravitationalAccelerationInBaseFrame = robot_state_->getOrientationBaseToWorld().inverseRotate(gravitationalAccelerationInWorldFrame);//torso_->getMeasuredState().getOrientationWorldToBase().rotate(gravitationalAccelerationInWorldFrame);
+
+  //  const int nDofPerLeg = 3; // TODO move to robot commons
+  //  const int nDofPerContactPoint = 3; // TODO move to robot commons
+
+    for (auto& legInfo : legInfos_)
+    {
+
+      /*
+       * Torque setpoints should be updated only is leg is support leg.
+       */
+      /*
+       *Golaoxu : use 2:LF+RH to stand
+       */
+        // 1.calculate the X
+        Eigen::Vector3d X_f1;
+        Eigen::Vector3d X_f2;
+        Eigen::VectorXd X_f;
+//        Eigen::VectorXd _Xb_vel;
+
+        Eigen::VectorXd _Xb_vel;
+        Eigen::VectorXd _Xb_error_last;
+
+        X_f.resize(6);
+        _Xb_vel.resize(6);
+        Position desired_q = robot_state_->getTargetPositionWorldToBaseInWorldFrame();
+        Position robot_q = robot_state_->getPositionWorldToBaseInWorldFrame();
+        //desired_q(0) = 0;
+        //desired_q(1) = 0;
+        X_f1 = desired_q.toImplementation() - robot_q.toImplementation();
+        X_f2 = X_f1;
+        X_f.segment(0,3) = X_f1;
+        X_f.segment(3,3) = X_f2;
+        _Xb_error_last = _Xb_error;
+        _Xb_error = X_f;
+        _Xb_vel = _Xb_error - _Xb_error_last;
+
+        // 2.calculate the A
+        Eigen::Vector3d A_f1;
+        Eigen::Vector3d A_f2;
+        Eigen::VectorXd A_f;
+        Eigen::VectorXd _Ab_vel;
+        A_f.resize(6);
+        _Ab_vel.resize(6);
+        RotationQuaternion _rotation_orien = robot_state_->getOrientationBaseToWorld();
+        RotationQuaternion _rotation_orien_desired = robot_state_->getTargetOrientationBaseToWorld();
+        //TODO: this should be construct as a function.(get R from Quaternion_unit)
+        double _w = _rotation_orien.w();
+        double _x = _rotation_orien.x();
+        double _y = _rotation_orien.y();
+        double _z = _rotation_orien.z();
+        Eigen::Matrix3d _R_real;
+        _R_real(0,0) = 1-2*_y*_y-2*_z*_z;
+        _R_real(0,1) = 2*_x*_y-2*_z*_w;
+        _R_real(0,2) = 2*_x*_z+2*_y*_w;
+        _R_real(1,0) = 2*_x*_y+2*_z*_w;
+        _R_real(1,1) = 1-2*_x*_x-2*_z*_z;
+        _R_real(1,2) = 2*_y*_z-2*_x*_w;
+        _R_real(2,0) = 2*_x*_z-2*_y*_w;
+        _R_real(2,1) = 2*_y*_z+2*_x*_w;
+        _R_real(2,2) = 1-2*_x*_x-2*_y*_y;
+        Eigen::Matrix3d _R_desired;
+        calculateRfromQ(_rotation_orien_desired,_R_desired);
+//        _R_desired << 1,0,0,
+//                      0,1,0,
+//                      0,0,1;
+        Eigen::Vector3d hip1_In_base;
+        Eigen::Vector3d hip2_In_base;
+        hip1_In_base << 0.42,0.175,0.002;
+        hip2_In_base << -0.42,-0.175,0.002;
+        A_f1 = ((_R_desired-_R_real)*hip1_In_base).transpose();
+        A_f2 = ((_R_desired-_R_real)*hip2_In_base).transpose();
+        A_f.segment(0,3) = A_f1;
+        A_f.segment(3,3) = A_f2;
+        _Ab_error_last = _Ab_error;
+        _Ab_error = A_f;
+        _Ab_vel = _Ab_error - _Ab_error_last;
+        // 3. calculate the force use X and A
+        Eigen::VectorXd F_d;
+        Eigen::VectorXd Kx;
+        Eigen::VectorXd Ka;
+        Eigen::VectorXd Dx;
+        Eigen::VectorXd Da;
+        Kx.resize(6);
+        Ka.resize(6);
+        Dx.resize(6);
+        Da.resize(6);
+        Kx << 7200, 7200, 7200, 7200, 7200, 7200;
+        Ka << 7000., 7000., 700., 7000., 7000., 700.;
+        Dx << 48000., 48000., 48000., 48000., 48000., 48000.;
+        Da << 580000., 580000., 580000., 580000., 580000., 580000.;
+        F_d.resize(6);
+        std::cout << "X_f: "<< Kx.array().cwiseProduct(X_f.array()) <<std::endl;
+        std::cout << "A_f"<<Ka.array().cwiseProduct(A_f.array()) <<std::endl;
+        std::cout << "_Xb_vel"<<Dx.array().cwiseProduct(_Xb_vel.array())<<std::endl;
+        std::cout << "_Ab_vel"<<Da.array().cwiseProduct(_Ab_vel.array()) <<std::endl;
+
+        //F_d:6*1 force (Different in python)
+        F_d = Kx.array().cwiseProduct(X_f.array()) + Ka.array().cwiseProduct(A_f.array()) + Dx.array().cwiseProduct(_Xb_vel.array()) + Da.array().cwiseProduct(_Ab_vel.array());
+//        // 4.add the compensation
+        Eigen::VectorXd gravity_comp;
+        gravity_comp.resize(6);
+        double mass = robot_state_->getRobotMass();
+        mass = mass * 9.8 / 2.0;
+        gravity_comp << 0,0,mass,0,0,mass;
+        F_d  += gravity_comp;
+        ROS_INFO_ONCE("2LEG2LEG2LEG2LEG2LEG2LEG");
+        std::cout <<"F_d"<< F_d.transpose() << std::endl;
+
+        if(legInfo.first == free_gait::LimbEnum::LF_LEG){
+        }else if(legInfo.first == free_gait::LimbEnum::LH_LEG){
+        }else if(legInfo.first == free_gait::LimbEnum::RF_LEG){
+        }else if(legInfo.first == free_gait::LimbEnum::RH_LEG){
+        }
+
+        if  (robot_state_->isSupportLeg(legInfo.first)) {
+
+          if (legInfo.second.isPartOfForceDistribution_)
+          {
+    //        LegBase::TranslationJacobian jacobian = legInfo.first->getTranslationJacobianFromBaseToFootInBaseFrame();
+            Eigen::Matrix3d jacobian = robot_state_->getTranslationJacobianFromBaseToFootInBaseFrame(legInfo.first);
+            Force contactForce = legInfo.second.desiredContactForce_;//! WSHY: TODO tranform to hip frame
+    //        ROS_INFO("contact force for %d is : \n", static_cast<int>(legInfo.first));
+    //        std::cout<<contactForce.toImplementation()<<std::endl;
+
+            Position tranformed_vector = robot_state_->getPositionFootToHipInHipFrame(legInfo.first, Position(contactForce.toImplementation()));
+    //        contactForce = Force(tranformed_vector.toImplementation());
+            ROS_DEBUG("leg Jacobian for %d is : \n", static_cast<int>(legInfo.first));
+    //        std::cout<<jacobian<<std::endl;
+
+
+    //        LegBase::JointTorques jointTorques = LegBase::JointTorques(jacobian.transpose() * contactForce.toImplementation());
+            free_gait::JointEffortsLeg jointTorques = free_gait::JointEffortsLeg(jacobian.transpose() * contactForce.toImplementation());
+    //      jointTorques += LegBase::JointTorques(torso_ Force(-torso_->getProperties().getMass() * gravitationalAccelerationInBaseFrame));
+            /* gravity */
+            /****************
+            * TODO(Shunyao) : fix jacobian for each link
+            ****************/
+    //        for (auto link : *legInfo.first->getLinks()) {
+    //          jointTorques -= LegBase::JointTorques( link->getTranslationJacobianBaseToCoMInBaseFrame().transpose() * Force(link->getMass() * gravitationalAccelerationInBaseFrame).toImplementation());
+    //        }
+
+            free_gait::JointPositionsLeg joint_position_leg = robot_state_->getJointPositionFeedbackForLimb(legInfo.first);
+            jointTorques += robot_state_->getGravityCompensationForLimb(legInfo.first, joint_position_leg, free_gait::Force(gravitationalAccelerationInBaseFrame.toImplementation()));
+
+    //        legInfo.first->setDesiredJointTorques(jointTorques);
+            robot_state_->setJointEffortsForLimb(legInfo.first, jointTorques);
+    //        ROS_INFO("Joint Torque for %d is : \n", static_cast<int>(legInfo.first));
+    //        std::cout<<jointTorques<<std::endl;
+          }
+          else
+          {
+            /*
+             * True if load factor is zero.
+             */
+    //        legInfo.first->setDesiredJointTorques(free_gait::JointEffortsLeg::Zero());
+              robot_state_->setJointEffortsForLimb(legInfo.first, free_gait::JointEffortsLeg::Zero());
+          }
+
+        }
+    }
+    return true;
+}
+
+
 bool ContactForceDistribution::resetOptimization()
 {
   isForceDistributionComputed_ = false;
@@ -950,6 +1252,22 @@ bool ContactForceDistribution::loadParameters()
   return true;
 }
 
+bool ContactForceDistribution::calculateRfromQ(const RotationQuaternion &_rotation_orien, Eigen::Matrix3d &_matR){
+    double _w = _rotation_orien.w();
+    double _x = _rotation_orien.x();
+    double _y = _rotation_orien.y();
+    double _z = _rotation_orien.z();
+    _matR(0,0) = 1-2*_y*_y-2*_z*_z;
+    _matR(0,1) = 2*_x*_y-2*_z*_w;
+    _matR(0,2) = 2*_x*_z+2*_y*_w;
+    _matR(1,0) = 2*_x*_y+2*_z*_w;
+    _matR(1,1) = 1-2*_x*_x-2*_z*_z;
+    _matR(1,2) = 2*_y*_z-2*_x*_w;
+    _matR(2,0) = 2*_x*_z-2*_y*_w;
+    _matR(2,1) = 2*_y*_z+2*_x*_w;
+    _matR(2,2) = 1-2*_x*_x-2*_y*_y;
+    return true;
+}
 //const LegGroup* ContactForceDistribution::getLegs() const {
 //  return legs_.get();
 //}

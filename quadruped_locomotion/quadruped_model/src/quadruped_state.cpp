@@ -28,7 +28,7 @@ LocalAngularVelocity QuadrupedState::base_feedback_angular_velocity_, QuadrupedS
 
 QuadrupedState::QuadrupedState()
   : QuadrupedKinematics(),
-    robot_mass_(22.73),
+    robot_mass_(13.73),
     //22.44
     CoM_in_base_(Position(0.0,0,0))
 {

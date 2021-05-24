@@ -83,8 +83,9 @@ namespace balance_controller{
 
         //in balance controller
         loadParams_MPC(node_handle);
+        ROS_INFO("Robot Mass : %f", robot_state->getRobotMass());
         //mpc_solver.reset(new MPC::ConvexMpc(robot_state->getRobotMass() ,inertia_list_mpc,4, 10, delta_t_MPC, _MPC_WEIGHTS));
-        mpc_solver.reset(new MPC::ConvexMpc(robot_state->getRobotMass() ,inertia_list_mpc,4, steps_MPC, delta_t_MPC, _MPC_WEIGHTS,torque_weight));
+        mpc_solver.reset(new MPC::ConvexMpc(robot_state->getRobotMass()+8.7,inertia_list_mpc,4, steps_MPC, delta_t_MPC, _MPC_WEIGHTS,torque_weight));
         single_leg_solver_.reset(new MyRobotSolver(node_handle, robot_state));
         single_leg_solver_->model_initialization();
         if(!single_leg_solver_->loadLimbModelFromURDF())
@@ -601,7 +602,7 @@ namespace balance_controller{
         int mit_use = 1;
         bool _pybullet = true;
         CtrlEnum ctrlx = CtrlEnum::MIT;
-        if(!collections_4_mpc(mit_use))
+        if(!collections_4_mpc(ctrlx))
           {
             ROS_ERROR("MPC compute failed");
             keep_flag = true;
@@ -2025,7 +2026,8 @@ namespace balance_controller{
             com_position[0] = _com_position.x();
             com_position[1] = _com_position.y();
             com_position[2] = _com_position.z();
-
+            // com_position[0] = 0.0;
+            // com_position[1] = 0.0;
             //2.com_velocity
             LinearVelocity _com_velocity = robot_state_->getLinearVelocityBaseInWorldFrame();
             com_velocity.resize(3);
@@ -2034,7 +2036,7 @@ namespace balance_controller{
             com_velocity[2] = _com_velocity.z();
             //3.rpy
             com_roll_pitch_yaw.resize(3);
-            RotationQuaternion _rotation_orien= robot_state_->getOrientationBaseToWorld().inverted();
+            RotationQuaternion _rotation_orien= robot_state_->getOrientationBaseToWorld();
             quaternion.resize(4);
             quaternion[0] = _rotation_orien.x();
             quaternion[1] = _rotation_orien.y();
@@ -2044,13 +2046,15 @@ namespace balance_controller{
             Eigen::Vector3d EulerAngle0 = ypr.setUnique().vector();
             com_roll_pitch_yaw[2] = 0;
             //QuaternionToEuler();
+            //roll and pitch is ok.
             com_roll_pitch_yaw[0] = EulerAngle0(2);
             com_roll_pitch_yaw[1] = EulerAngle0(1);
+            //From the lecture
+            com_roll_pitch_yaw[2] = EulerAngle0(0);
             //4.ang_vel
 
 
            // LocalAngularVelocity _com_angular_velocity =  robot_state_->getAngularVelocityBaseInBaseFrame();
-
             LocalAngularVelocity _com_angular_velocity =  robot_state_->getAngularVelocityBaseInBaseFrame();
             com_angular_velocity.resize(3);
             com_angular_velocity[0] = _com_angular_velocity.x();
@@ -2112,20 +2116,24 @@ namespace balance_controller{
         //                 foot_positions_body_frame[1]<<" "<<
         //                 foot_positions_body_frame[2]<< endl;
             //7.frition_coeffs
-            foot_friction_coeffs = {0.45, 0.45, 0.45, 0.45};
+            foot_friction_coeffs = {0.6, 0.6, 0.6, 0.6};
             //8.desire_pos
             Position _desired_com_position = robot_state_->getTargetPositionWorldToBaseInWorldFrame();
             desired_com_position.resize(3);
-            desired_com_position[0] = 0;
-            desired_com_position[1] = 0;
+            desired_com_position[0] = com_position[0];
+            desired_com_position[1] = com_position[1];
+            // desired_com_position[0] = 0;
+            // desired_com_position[1] = 0;
             desired_com_position[2] = _desired_com_position.z();
             //0319
-            desired_com_position[2] = 0.36;
+            desired_com_position[2] = 0.40;
             //9.desire_vel
             LinearVelocity _desired_com_velocity = robot_state_->getTargetLinearVelocityBaseInWorldFrame();
             desired_com_velocity.resize(3);
             desired_com_velocity[0] = _desired_com_velocity.x();
             desired_com_velocity[1] = _desired_com_velocity.y();
+            desired_com_velocity[0] = 0;
+            desired_com_velocity[1] = 0;
             desired_com_velocity[2] = 0;
             //10.desire_rpy
             _rotation_orien = robot_state_->getTargetOrientationBaseToWorld();
@@ -2137,7 +2145,7 @@ namespace balance_controller{
             desired_com_roll_pitch_yaw.resize(3);
             EulerAnglesZyx ypr_d(_rotation_orien);
             Eigen::Vector3d EulerAngle_d=ypr_d.setUnique().vector();
-            desired_com_roll_pitch_yaw[2] = 0;
+            desired_com_roll_pitch_yaw[2] = com_roll_pitch_yaw[2];
             desired_com_roll_pitch_yaw[0] = 0;
             desired_com_roll_pitch_yaw[1] = 0;
             //11.desire_ang_vel
@@ -2145,7 +2153,7 @@ namespace balance_controller{
             desired_com_angular_velocity.resize(3);
             desired_com_angular_velocity[0] = 0;
             desired_com_angular_velocity[1] = 0;
-            desired_com_angular_velocity[2] = _desired_com_angular_velocity.z();
+            desired_com_angular_velocity[2] = 0;
             return  true;
         }
     }
@@ -2183,7 +2191,7 @@ namespace balance_controller{
               free_gait::JointEffortsLeg jointTorques = free_gait::JointEffortsLeg(jacobian.transpose() * contactForce_MPC.toImplementation());
               free_gait::JointPositionsLeg joint_position_leg = robot_state_->getJointPositionFeedbackForLimb(legInfo.first);
               jointTorques += robot_state_->getGravityCompensationForLimb(legInfo.first, joint_position_leg, free_gait::Force(gravitationalAccelerationInBaseFrame.toImplementation()));
-              std::cout << jointTorques << " **";
+              //std::cout << jointTorques << " **";
               robot_state_->setJointEffortsForLimb(legInfo.first, jointTorques);
             }
             else
@@ -2192,7 +2200,7 @@ namespace balance_controller{
             }
           }
         }
-        std::cout<<endl;
+        //std::cout<<endl;
         return true;
     }
 

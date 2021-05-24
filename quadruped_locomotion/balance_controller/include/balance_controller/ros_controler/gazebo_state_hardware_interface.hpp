@@ -42,6 +42,7 @@
 //free_gait
 #include "free_gait_msgs/RobotState.h"
 
+#include "queue"
 namespace balance_controller {
 
 class SimRobotStateHardwareInterface : public gazebo_ros_control::RobotHWSim//public hardware_interface::RobotHW, public hardware_interface::HardwareInterface
@@ -120,7 +121,7 @@ protected:
   std::vector<double> joint_position_command_;
   std::vector<double> last_joint_position_command_;
   std::vector<double> joint_velocity_command_;
-
+  std::vector<double> joint_acc;
   std::vector<gazebo::physics::JointPtr> sim_joints_;
 
 //  gazebo::sensors::ContactSensorPtr contact_sensor_ptr;
@@ -141,6 +142,8 @@ protected:
   double position[3], orinetation[4], linear_vel[3], angular_vel[3], contact_pressure[4];
   int foot_contact[4], motor_status_word[12], mode_of_joint[12];
   free_gait_msgs::RobotState actual_robot_state_;
+  std::queue<std::vector<double>> windows_v;
+  std::vector<double> sums_v;
 };
 
 typedef boost::shared_ptr<SimRobotStateHardwareInterface> SimRobotStateHardwareInterfacePtr;

@@ -33,8 +33,13 @@ find_package(catkin REQUIRED COMPONENTS
   dynamic_reconfigure
   laikago_msgs
   laikago_ros_control
+  pronto_quadruped_commons
+  laikago_robcogen
+  pronto_laikago_commons
 )
 find_package(osqp REQUIRED)
+find_library(pinocchio COMPONENTS URDFReader REQUIRED)
+find_library(iitgenlaikago REQUIRED)
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
@@ -150,7 +155,9 @@ catkin_package(
   realtime_tools
   sim_assiants
   ooqp_eigen_interface
-#  DEPENDS system_lib
+  pronto_quadruped_commons
+  laikago_robcogen
+  DEPENDS iitgenlaikago
 )
 
 ###########
@@ -164,6 +171,9 @@ include_directories(
   /home/glx/laikago_catkin/src/laikago_sdk/include
   /home/glx/laikago_catkin/src/quadruped_locomotion/laikago_ros_control/include
   /home/glx/laikago_catkin/src/laikago_ros/laikago_controller/include
+  /home/glx/laikago_catkin/src/pronto/pronto_quadruped_commons/include
+  /home/glx/laikago_catkin/src/quadruped_locomotion/laikago_robcogen/include
+  /usr/local/include
   ${catkin_INCLUDE_DIRS}
 )
 
@@ -182,6 +192,7 @@ add_library(${PROJECT_NAME}
    src/contact_force_distribution/ContactForceDistributionBase.cpp
    src/contact_force_distribution/ContactForceDistribution.cpp
    src/contact_force_distribution/mpc_forcedistribution.cpp
+#   src/feet_force/feet_contact_force.cpp
    src/state_switcher/StateSwitcher.cpp
    src/state_switcher/StateSwitcherBase.cpp
 #   src/ros_controller/ros_balance_controller.cpp
@@ -198,7 +209,11 @@ add_library(ros_balance_controller
   )
 target_link_libraries(ros_balance_controller balance_controller ${catkin_LIBRARIES} osqp::osqp)
 
+#add_library(pronto_laikago_commons src/feet_force/forward_kinematics.cpp
+#                            src/feet_force/feet_contact_forces.cpp
+#                            src/feet_force/feet_jacobians.cpp)
 
+#target_link_libraries(pronto_laikago_commons ${PROJECT_NAME} ${catkin_LIBRARIES} iitgenlaikago)
 
 
 #   Golaoxu: add mpc controller for robot
@@ -253,6 +268,8 @@ target_link_libraries(single_leg_controller
 ## The recommended prefix ensures that target names across packages don't collide
 # add_executable(${PROJECT_NAME}_node src/balance_controller_node.cpp)
 #add_executable(balance_controller_test_node test/test.cpp)
+add_executable(test_pino test/test_pino.cpp)
+target_link_libraries(test_pino ${catkin_LIBRARIES} pinocchio iitgenlaikago)
 add_executable(balance_controller_manager src/ros_controller/balance_controller_manager.cpp)
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -272,6 +289,7 @@ target_link_libraries(
   ${PROJECT_NAME}
   ${catkin_LIBRARIES}
   ${EXTRA_LIBS}
+  ${pinocchio_URDFReader_LIBRARY}
   )
 target_link_libraries(balance_controller_manager
   ${PROJECT_NAME}

@@ -60,6 +60,10 @@
   <build_depend>controller_interface</build_depend>
   <build_depend>pluginlib</build_depend>
   <build_depend>gazebo_dev</build_depend>
+  <build_depend>quadruped_robcogen</build_depend>
+  <build_depend>pronto_quadruped_commons</build_depend>
+  <build_export_depend>quadruped_robcogen</build_export_depend>
+  <build_export_depend>pronto_quadruped_commons</build_export_depend>
   <exec_depend>gazebo_dev</exec_depend>
   <exec_depend>pluginlib</exec_depend>
   <exec_depend>controller_interface</exec_depend>
@@ -69,6 +73,8 @@
   <exec_depend>free_gait_core</exec_depend>
   <exec_depend>qp_solver</exec_depend>
   <exec_depend>roscpp</exec_depend>
+  <exec_depend>quadruped_robcogen</exec_depend>
+  <exec_depend>pronto_quadruped_commons</exec_depend>
   <depend>control_toolbox</depend>
   <depend>controller_manager</depend>
   <depend>hardware_interface</depend>
@@ -84,6 +90,9 @@
   <depend>ros_ethercat_driver</depend>
   <depend>laikago_ros_control</depend>
   <depend>dynamic_reconfigure</depend>
+  <depend>pinocchio</depend>
+  <!-- <depend>pronto_quadruped_commons</depend> -->
+  <depend>laikago_robcogen</depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>
