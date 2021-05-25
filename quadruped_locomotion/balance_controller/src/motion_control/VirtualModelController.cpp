@@ -521,9 +521,9 @@ bool VirtualModelController::collections_4_mpc(bool ways_mit){
     //2.com_velocity
     LinearVelocity _com_velocity = robot_state_->getLinearVelocityBaseInWorldFrame();
     com_velocity.resize(3);
-    com_velocity[0] = _com_velocity.x();
-    com_velocity[1] = _com_velocity.y();
-    com_velocity[2] = _com_velocity.z();
+    com_velocity[0] = _com_velocity.x()/0.36;
+    com_velocity[1] = _com_velocity.y()/0.36;
+    com_velocity[2] = _com_velocity.z()/0.36;
     //3.rpy
     com_roll_pitch_yaw.resize(3);
     RotationQuaternion _rotation_orien= robot_state_->getOrientationBaseToWorld();
@@ -613,8 +613,6 @@ bool VirtualModelController::collections_4_mpc(bool ways_mit){
     desired_com_position[0] = 0.0;
     desired_com_position[1] = 0.0;
     //0319
-    desired_com_position[2] = _desired_com_position.z();
-
     //9.desire_vel
     LinearVelocity _desired_com_velocity = robot_state_->getTargetLinearVelocityBaseInWorldFrame();
     desired_com_velocity.resize(3);

@@ -92,7 +92,7 @@ using namespace free_gait;
     surface_normal.vector.x = 0.0;
     surface_normal.vector.y = 0.0;
     surface_normal.vector.z = 1.0;
-    height_ = 0.37;
+    height_ = 0.45;
     step_number = 0;
     sigma_st_0 = 0.8;
     sigma_st_1 = 0.8;
@@ -142,6 +142,7 @@ using namespace free_gait;
     hip_dispacement.emplace(LimbEnum::RF_LEG, Position(0,-step_displacement,0));
     hip_dispacement.emplace(LimbEnum::LH_LEG, Position(0,step_displacement,0));
     hip_dispacement.emplace(LimbEnum::RH_LEG, Position(0,-step_displacement,0));
+    height_ = 0.45;
 
     sigma_st_0 = 0.8;
     sigma_st_1 = 0.8;

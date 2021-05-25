@@ -231,6 +231,7 @@ namespace balance_controller {
     int steps_MPC;
     double delta_t_MPC;
     double torque_weight;
+    double body_mass;
     std::vector<double> com_position;
     std::vector<double> com_velocity;
     std::vector<double> com_roll_pitch_yaw;

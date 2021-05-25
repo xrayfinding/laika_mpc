@@ -194,7 +194,8 @@ Matrix3d ConvertToSkewSymmetric(const Vector3d& vec) {
     skew_symm << 0, -vec(2), vec(1), vec(2), 0, -vec(0), -vec(1), vec(0), 0;
     return skew_symm;
 }
-
+//Golaoxu: In this Amat, the angular velocity dynamic don't approximated in R
+//!!!
 void CalculateAMat(const Vector3d& rpy, MatrixXd* a_mat_ptr) {
     // The transformation of angular velocity to roll pitch yaw rate. Caveat:
     // rpy rate is not a proper vector and does not follow the common vector
@@ -388,7 +389,7 @@ double EstimateCoMHeightSimple(
 
     // We don't support jumping in air for now.
     assert(legs_in_contact > 0);
-    return abs(com_height / legs_in_contact);
+    return -(com_height / legs_in_contact);
 }
 
 MatrixXd AsBlockDiagonalMat(const std::vector<double>& qp_weights,
@@ -489,6 +490,9 @@ std::vector<double> ConvexMpc::ComputeContactForces(
 
     // First we compute the foot positions in the world frame.
     assert(com_roll_pitch_yaw.size() == k3Dim);
+    //Golaoxu : X-Y-Z , can rotate the point coordinate express in base to the coordinate in world
+    // using angele_axisd XYZ is the same as angel_axisd  ZYX --->>>get the same quaternion
+    // the Pworld = q*Pbase;
     const Quaterniond com_rotation =
         AngleAxisd(com_roll_pitch_yaw[0], Vector3d::UnitX()) *
         AngleAxisd(com_roll_pitch_yaw[1], Vector3d::UnitY()) *
@@ -511,7 +515,6 @@ std::vector<double> ConvexMpc::ComputeContactForces(
         com_position.size() == k3Dim
         ? com_position[2]
         : EstimateCoMHeightSimple(foot_positions_world_, foot_contact_states);
-
     // In MPC planning we don't care about absolute position in the horizontal
     // plane.
     const double com_x = 0;
@@ -701,71 +704,5 @@ std::vector<double> ConvexMpc::ComputeContactForces(
 
     return qp_solution_;
 }
-
-//bool ConvexMpc::computeJointTorques()
-//{
-//  const LinearAcceleration gravitationalAccelerationInWorldFrame = LinearAcceleration(0.0,0.0,-9.8);//torso_->getProperties().getGravity();
-//  const LinearAcceleration gravitationalAccelerationInBaseFrame = robot_state_->getOrientationBaseToWorld().inverseRotate(gravitationalAccelerationInWorldFrame);//torso_->getMeasuredState().getOrientationWorldToBase().rotate(gravitationalAccelerationInWorldFrame);
-
-////  const int nDofPerLeg = 3; // TODO move to robot commons
-////  const int nDofPerContactPoint = 3; // TODO move to robot commons
-
-//  for (auto& legInfo : legInfos_)
-//  {
-
-//    /*
-//     * Torque setpoints should be updated only is leg is support leg.
-//     */
-//    if  (robot_state_->isSupportLeg(legInfo.first)) {
-
-//      if (legInfo.second.isPartOfForceDistribution_)
-//      {
-////        LegBase::TranslationJacobian jacobian = legInfo.first->getTranslationJacobianFromBaseToFootInBaseFrame();
-//        Eigen::Matrix3d jacobian = robot_state_->getTranslationJacobianFromBaseToFootInBaseFrame(legInfo.first);
-//        Force contactForce = legInfo.second.desiredContactForce_;//! WSHY: TODO tranform to hip frame
-////        ROS_INFO("contact force for %d is : \n", static_cast<int>(legInfo.first));
-////        std::cout<<contactForce.toImplementation()<<std::endl;
-
-//        Position tranformed_vector = robot_state_->getPositionFootToHipInHipFrame(legInfo.first, Position(contactForce.toImplementation()));
-////        contactForce = Force(tranformed_vector.toImplementation());
-//        ROS_DEBUG("leg Jacobian for %d is : \n", static_cast<int>(legInfo.first));
-////        std::cout<<jacobian<<std::endl;
-
-
-////        LegBase::JointTorques jointTorques = LegBase::JointTorques(jacobian.transpose() * contactForce.toImplementation());
-//        free_gait::JointEffortsLeg jointTorques = free_gait::JointEffortsLeg(jacobian.transpose() * contactForce.toImplementation());
-////      jointTorques += LegBase::JointTorques(torso_ Force(-torso_->getProperties().getMass() * gravitationalAccelerationInBaseFrame));
-//        /* gravity */
-//        /****************
-//        * TODO(Shunyao) : fix jacobian for each link
-//        ****************/
-////        for (auto link : *legInfo.first->getLinks()) {
-////          jointTorques -= LegBase::JointTorques( link->getTranslationJacobianBaseToCoMInBaseFrame().transpose() * Force(link->getMass() * gravitationalAccelerationInBaseFrame).toImplementation());
-////        }
-
-//        free_gait::JointPositionsLeg joint_position_leg = robot_state_->getJointPositionFeedbackForLimb(legInfo.first);
-//        jointTorques += robot_state_->getGravityCompensationForLimb(legInfo.first, joint_position_leg, free_gait::Force(gravitationalAccelerationInBaseFrame.toImplementation()));
-
-////        legInfo.first->setDesiredJointTorques(jointTorques);
-//        robot_state_->setJointEffortsForLimb(legInfo.first, jointTorques);
-////        ROS_INFO("Joint Torque for %d is : \n", static_cast<int>(legInfo.first));
-////        std::cout<<jointTorques<<std::endl;
-//      }
-//      else
-//      {
-//        /*
-//         * True if load factor is zero.
-//         */
-////        legInfo.first->setDesiredJointTorques(free_gait::JointEffortsLeg::Zero());
-//          robot_state_->setJointEffortsForLimb(legInfo.first, free_gait::JointEffortsLeg::Zero());
-//      }
-
-//    }
-
-//  }
-////  ROS_INFO("Computed joint Torque once : \n");
-////  std::cout<<robot_state_->getAllJointEfforts()<<std::endl;
-//  return true;
-//}
 
 }//end namespace

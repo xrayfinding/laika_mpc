@@ -65,7 +65,7 @@ single_leg_controller:
     kp: 300
     kd: 50
 mpc:
-  weights: [5, 5, 0.2, 0, 0, 10, 0., 0., 1., 1., 1., 0, 0]
+  weights: [5, 5, 0.2, 0, 0, 10, 0.1, 0.1, 1., 1., 1., 1., 0]
   #weights: [0.25, 0.25, 0.2, 2, 2, 50, 0, 0, 0.3, 0.2, 0.2, 0.1,0]
   #weights: [0.25, 2, 10, 50, 50, 100, 0, 0, 0.3, 0.2, 0.2, 0.1, 0.0]
   #roll-pitch-yaw x-y-z ang-vel vel gravity-place-holder
@@ -87,5 +87,6 @@ mpc:
   #mi:10
   delta_t_MPC: 0.05
   #mi:0.026
-  torque_weight: 0.000001
+  torque_weight: 0.00001
   #mi:4e-5
+  body_mass: 20.73

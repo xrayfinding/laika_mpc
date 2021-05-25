@@ -81,7 +81,7 @@ namespace balance_controller{
     //! WSHY: base balance QP controller
     contact_distribution_.reset(new ContactForceDistribution(node_handle, robot_state));
     loadParams_MPC(node_handle);
-    mpc_solver.reset(new MPC::ConvexMpc(robot_state->getRobotMass(),inertia_list_mpc,4, steps_MPC, delta_t_MPC, _MPC_WEIGHTS,torque_weight));
+    mpc_solver.reset(new MPC::ConvexMpc(body_mass,inertia_list_mpc,4, steps_MPC, delta_t_MPC, _MPC_WEIGHTS,torque_weight));
     virtual_model_controller_.reset(new VirtualModelController(node_handle, robot_state, contact_distribution_,mpc_solver));
     //! WSHY: single leg controller
     single_leg_solver_.reset(new MyRobotSolver(node_handle, robot_state));
@@ -1830,6 +1830,12 @@ bool RosBalanceController::loadParams_MPC(const ros::NodeHandle& node_handle){
     } else {
       ROS_ERROR("Did not find ROS parameter for robot state topic '/mpc/torque_weight'.");
       return false;
+    }
+    if(node_handle.hasParam("/mpc/body_mass")){
+        node_handle.getParam("/mpc/body_mass",body_mass);
+    }else{
+        ROS_ERROR("Did not find ROS parameter for robot state topic '/mpc/bpdy_mass'.");
+        return false;
     }
     return true;
 }
