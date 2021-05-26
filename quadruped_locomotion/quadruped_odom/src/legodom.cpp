@@ -28,9 +28,14 @@ QuadrupedEstimation::QuadrupedEstimation(const ros::NodeHandle& _nodehandle,
     imu_sub = nodeHandle_.subscribe<sensor_msgs::Imu>(imu_topic_name_, 10, &QuadrupedEstimation::imuCb, this);
 
     //########################pronto##########################
+    nodeHandle_.param("/use_kin_state",use_kin_state,bool(false));
+    nodeHandle_.param("/use_pronto_pose",use_pronto_pose,bool(false));
+    nodeHandle_.param("/use_pronto_twist",use_pronto_twist,bool(false));
+    nodeHandle_.param("/use_imu_orientation",use_imu_orientation,bool(false));
     pronto_pose_sub = nodeHandle_.subscribe("/laikago_state/pose",10,&QuadrupedEstimation::prontoPoseCB,this);
     pronto_twist_sub = nodeHandle_.subscribe("/laikago_state/twist",10,&QuadrupedEstimation::prontoTwistCB,this);
     init_pose_sub = nodeHandle_.subscribe("/laikago_pose",1,&QuadrupedEstimation::InitCB,this);
+    LegOdom_sub_ = nodeHandle_.subscribe("/laikago_pronto/foot_odom",1,&QuadrupedEstimation::KinCB,this);
     //########################pronto##########################
 //    foot_state_sub = nodeHandle_.subscribe<std_msgs::Float64MultiArray>("/gazebo/foot_contact_state", 10, &QuadrupedEstimation::footstateCb, this);
 
@@ -50,7 +55,7 @@ QuadrupedEstimation::QuadrupedEstimation(const ros::NodeHandle& _nodehandle,
     legPose_pub = nodeHandle_.advertise<geometry_msgs::PoseWithCovarianceStamped>("/legodom/base_pose", 10);
 
     imuvel_pub = nodeHandle_.advertise<geometry_msgs::Twist>("/imu_vel",10);
-    rpy_pub = nodeHandle_.advertise<geometry_msgs::Vector3>("/rpy_ang",10);
+
 
 }
 
@@ -113,6 +118,16 @@ void QuadrupedEstimation::RobotStateLoad(){
 
 }
 
+void QuadrupedEstimation::KinCB(const geometry_msgs::PoseWithCovarianceStamped &pose){
+    if(use_kin_state){
+        ROS_WARN_ONCE("get kin msg!!!!!!!!!!");
+        odom_position.x() = pose.pose.pose.position.x;
+        odom_position.y() = pose.pose.pose.position.y;
+        odom_position.z() = pose.pose.pose.position.z;
+    }
+
+
+}
 void QuadrupedEstimation::InitCB(const geometry_msgs::PoseWithCovarianceStamped& pose){
     ROS_WARN_ONCE("get initpose msg!!!!!!!!!!");
 //    odom_position.x() = pose.pose.pose.position.x;
@@ -124,27 +139,43 @@ void QuadrupedEstimation::InitCB(const geometry_msgs::PoseWithCovarianceStamped&
 //    odom_orientation.z() = pose.pose.pose.orientation.z;
 }
 void QuadrupedEstimation::prontoPoseCB(const geometry_msgs::PoseWithCovarianceStamped& pose){
-    ROS_WARN_ONCE("get prontoPose msg!!!!!!!!!!");
-    odom_position.x() = pose.pose.pose.position.x;
-    odom_position.y() = pose.pose.pose.position.y;
-    odom_position.z() = pose.pose.pose.position.z;
-    odom_orientation.w() = pose.pose.pose.orientation.w;
-    odom_orientation.x() = pose.pose.pose.orientation.x;
-    odom_orientation.y() = pose.pose.pose.orientation.y;
-    odom_orientation.z() = pose.pose.pose.orientation.z;
+    if(use_pronto_pose){
+        ROS_WARN_ONCE("get prontoPose msg!!!!!!!!!!");
+
+        odom_position.x() = pose.pose.pose.position.x;
+        odom_position.y() = pose.pose.pose.position.y;
+        odom_position.z() = pose.pose.pose.position.z;
+        odom_orientation.w() = pose.pose.pose.orientation.w;
+        odom_orientation.x() = pose.pose.pose.orientation.x;
+        odom_orientation.y() = pose.pose.pose.orientation.y;
+        odom_orientation.z() = pose.pose.pose.orientation.z;
+        ROS_WARN_ONCE("get prontoPose msg!!!!!!!!!!");
+        ROS_WARN_ONCE("get prontoPose msg!!!!!!!!!!");
+        ROS_WARN_ONCE("get prontoPose msg!!!!!!!!!!");
+    }
+
 }
 void QuadrupedEstimation::prontoTwistCB(const geometry_msgs::TwistWithCovarianceStamped &twist){
-    //ROS_WARN("get prontoTwist msg!!!!!!!!!!");
-    odom_vel.x() = twist.twist.twist.linear.x;
-    odom_vel.y() = twist.twist.twist.linear.y;
-    odom_vel.z() = twist.twist.twist.linear.z;
+    if(use_pronto_twist){
+        ROS_WARN_ONCE("get prontoTwist msg!!!!!!!!!!");
+        odom_vel.x() = twist.twist.twist.linear.x;
+        odom_vel.y() = twist.twist.twist.linear.y;
+        odom_vel.z() = twist.twist.twist.linear.z;
+    }
+
 }
 void QuadrupedEstimation::imuCb(const sensor_msgs::Imu::ConstPtr& imu_msg){
 
     ROS_WARN_ONCE("get imu_msg!!!!!!!!!!!!!!");
     imu_output = *imu_msg;
     imu_cb_flag = true;
-
+    if(use_imu_orientation){
+        ROS_WARN_ONCE("using imu to get orientation!!!!!!!!!!!");
+        odom_orientation.w()=imu_msg->orientation.w;
+        odom_orientation.x()=imu_msg->orientation.x;
+        odom_orientation.y()=imu_msg->orientation.y;
+        odom_orientation.z()=imu_msg->orientation.z;
+    }
 }
 
 void QuadrupedEstimation::jointsCb(const sensor_msgs::JointState::ConstPtr& joint_msg){
@@ -244,7 +275,7 @@ void QuadrupedEstimation::robotstateCb(const free_gait_msgs::RobotState::ConstPt
 
 
 void QuadrupedEstimation::InitParam(){
-    //ROS_ERROR("............Initializing Params.............");
+    ROS_ERROR("............Initializing Params.............");
 
     //data form topic
 //    imu_out.data.resize(11);

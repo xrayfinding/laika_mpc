@@ -49,7 +49,7 @@ public:
     surface_normal.vector.x = 0.0;
     surface_normal.vector.y = 0.0;
     surface_normal.vector.z = 1.0;
-    height = 0.45;
+    height = 0.42;
     step_number = 0;
   }
 
@@ -180,7 +180,7 @@ int main(int argc, char *argv[])
   free_gait_msgs::ExecuteStepsGoal steps_goal;
   geometry_msgs::PointStamped lf_foot_holds, rf_foot_holds, lh_foot_holds, rh_foot_holds;
   Position LF_nominal, RF_nominal, LH_nominal, RH_nominal;
-  double height = 0.45;
+  double height = 0.42;
   LF_nominal = Position(0.21935, 0.087,-height);
   RF_nominal = Position(0.21935, -0.087,-height);
   LH_nominal = Position(-0.21935, 0.087,-height);

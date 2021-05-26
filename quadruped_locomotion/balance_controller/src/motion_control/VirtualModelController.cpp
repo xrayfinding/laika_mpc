@@ -140,7 +140,6 @@ bool VirtualModelController::compute()
    *GoLaoxu:if follow codes are executed, the force that we used is caculated by MPC(sigle rigid body).
    *
    */
-//  Position footpos = robot_state_->getPositionBaseToFootInBaseFrame(free_gait::LimbEnum::LF_LEG);
   collections_4_mpc(true);
   vector<double> mpc_ans =  convexMpc_->ComputeContactForces(com_position, com_velocity, com_roll_pitch_yaw, com_angular_velocity,
                                    foot_contact_states,foot_positions_body_frame ,foot_friction_coeffs,

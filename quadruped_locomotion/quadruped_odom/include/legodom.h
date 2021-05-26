@@ -135,6 +135,7 @@ public:
     ////////////////////
 
     bool imu_cb_flag, joints_cb_flag, foot_cb_flag, tfcal_flag,topic_flag,no_data_input_flag,P_init_flag,first_check_p,velget_flag,position_joints_flag,gazebo_flag;
+    bool use_kin_state,use_pronto_pose,use_pronto_twist,use_imu_orientation;
     int foot_flag;
     double z_init,init_x,init_y ,init_z,init_wx,init_wy,init_wz,init_ww;
     unsigned int cycle_T,cycle_step,P_init_time;
@@ -184,13 +185,13 @@ public:
     std_msgs::Float64MultiArray legodom_error_cal;
     std::string _cal_vel_way, _orientation_way, _cal_position_way, imu_topic_name_;
 
-    ros::Publisher legodom_odom_pub,legodom_error_pub,legodom_map_pub, legodom_init_pub,legPose_pub,gazebo_pub,imuvel_pub,rpy_pub;
+    ros::Publisher legodom_odom_pub,legodom_error_pub,legodom_map_pub, legodom_init_pub,legPose_pub,gazebo_pub,imuvel_pub;
 
     ros::Time init_time;
 private:
     ros::NodeHandle nodeHandle_, nodeh_;
     ros::Subscriber imu_sub,joints_sub,foot_state_sub, gazebo_sub,robot_state_sub,modelStatesSub_;
-    ros::Subscriber pronto_pose_sub,pronto_twist_sub,init_pose_sub;
+    ros::Subscriber pronto_pose_sub,pronto_twist_sub,init_pose_sub,LegOdom_sub_;
     //main function
     std::shared_ptr<free_gait::State> robot_state_;
     double _cal_fator_x, _cal_fator_y, _cal_fator_z, real_time_factor;
@@ -210,6 +211,7 @@ private:
     void InitCB(const geometry_msgs::PoseWithCovarianceStamped& pose);
     void prontoPoseCB(const geometry_msgs::PoseWithCovarianceStamped& pose);
     void prontoTwistCB(const geometry_msgs::TwistWithCovarianceStamped& twist);
+    void KinCB(const geometry_msgs::PoseWithCovarianceStamped& pose);
 
     //just for time at sama time
     //    void sensor_callback(const sensor_msgs::ImuConstPtr &imu_msg,

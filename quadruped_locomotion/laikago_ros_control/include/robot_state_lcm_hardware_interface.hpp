@@ -25,6 +25,7 @@
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/JointState.h>
 #include <geometry_msgs/WrenchStamped.h>
+#include <std_msgs/Float64MultiArray.h>
 
 // URDF
 #include <urdf/model.h>
@@ -73,7 +74,13 @@ public:
                        std_srvs::SetBool::Response& response);
   bool Controller_switchCB(controller_manager_msgs::SwitchController::Request& request,
                        controller_manager_msgs::SwitchController::Response& response);
-
+  bool Position_readfileCB(std_srvs::SetBool::Request& request,
+                                  std_srvs::SetBool::Response& response);
+//  bool Position_readfileCB(std_srvs::SetBool::Request& request,
+//                                  std_srvs::SetBool::Response& response);
+  bool Position_readfilestopCB(std_srvs::SetBool::Request& request,
+                                  std_srvs::SetBool::Response& response);
+  double moveAllPosition(double targetPos, double current_time, int j);
   bool Init_flag();
   void update_loop();
 
@@ -171,7 +178,7 @@ protected:
   std::vector<double> joint_position_command_;
   std::vector<double> last_joint_position_command_;
   std::vector<double> joint_velocity_command_;
-
+  std::vector<double> current_pos;
   std::string physics_type_;
 
   // e_stop_active_ is true if the emergency stop is active.
@@ -202,7 +209,7 @@ private:
   laikago::LCM roslcm;
   geometry_msgs::WrenchStamped lf_contact_force,rf_contact_force,rh_contact_force,lh_contact_force;
   sensor_msgs::Imu imu_msgs_;
-  sensor_msgs::JointState joint_state_msgs_;
+  sensor_msgs::JointState joint_state_msgs_, joint_command_to_print;
   ServoCmd servoCmd;
   //MXR::NOTE: container to save multi_command
   std::vector<ServoCmd> multi_servoCmd;
@@ -214,14 +221,17 @@ private:
   ros::Publisher Imu_data_pub_;
   ros::Publisher joint_state_pub_;
   ros::Publisher lf_foot_contact_force_pub,rf_foot_contact_force_pub,
-  rh_foot_contact_force_pub,lh_foot_contact_force_pub;
+  rh_foot_contact_force_pub,lh_foot_contact_force_pub, all_leg_contact_state_pub, joint_command_pub;
   std::string imu_topic_name_;
 
   urdf::JointConstSharedPtr joint_urdf;
 
   ros::ServiceServer laikago_position_init_server_,laikago_position_init_stop_server_,laikago_controller_switch_server_;
+  ros::ServiceServer laikago_position_readfile_server_,laikago_position_readfile_stop_server_;
   bool init_flag,test_flag,laikago_position_init_buffer_,last_laikago_position_init_buffer_,laikago_position_init_stop_buffer_;
   std::string controller_name;
+  std_msgs::Float64MultiArray footstate_;
+  bool laikago_position_readfile_buffer_,laikago_position_readfile_stop_buffer_;
 };
 
 

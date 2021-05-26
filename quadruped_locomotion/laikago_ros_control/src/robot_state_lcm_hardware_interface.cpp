@@ -12,6 +12,7 @@ float Kp[3] = {0};
 static long motiontime = 0;
 RobotStateLcmHardwareInterface::RobotStateLcmHardwareInterface()
 {
+    footstate_.data.resize(4);
     //Publish IMU data for stata estimation.
     Imu_data_pub_ = node_handle_.advertise<sensor_msgs::Imu>("/imu", 1);
     //Publish joint state for showing on RVIZ.
@@ -19,10 +20,16 @@ RobotStateLcmHardwareInterface::RobotStateLcmHardwareInterface()
     lf_foot_contact_force_pub = node_handle_.advertise<geometry_msgs::WrenchStamped>("/lf_contact_force",1);
     rf_foot_contact_force_pub = node_handle_.advertise<geometry_msgs::WrenchStamped>("/rf_contact_force",1);
     rh_foot_contact_force_pub = node_handle_.advertise<geometry_msgs::WrenchStamped>("/rh_contact_force",1);
+    lh_foot_contact_force_pub = node_handle_.advertise<geometry_msgs::WrenchStamped>("/lh_contact_force",1);
     laikago_position_init_server_ = node_handle_.advertiseService("/laikago_position_init", &RobotStateLcmHardwareInterface::Position_initCB,this);
     laikago_position_init_stop_server_ = node_handle_.advertiseService("/laikago_position_init_stop", &RobotStateLcmHardwareInterface::Position_stopCB,this);
     laikago_controller_switch_server_ = node_handle_.advertiseService("/mxr/switch_controller",&RobotStateLcmHardwareInterface::Controller_switchCB,this);
-    lh_foot_contact_force_pub = node_handle_.advertise<geometry_msgs::WrenchStamped>("/lh_contact_force",1);
+    laikago_position_readfile_server_ = node_handle_.advertiseService("/laikago_position_readfile",&RobotStateLcmHardwareInterface::Position_readfileCB,this);
+    laikago_position_readfile_stop_server_ = node_handle_.advertiseService("/laikago_position_readfile_stop",&RobotStateLcmHardwareInterface::Position_readfilestopCB,this);
+    all_leg_contact_state_pub = node_handle_.advertise<std_msgs::Float64MultiArray>("/laikago_contact_state",1);
+    //print the joint_command(don't call the log_data service)
+    joint_command_pub = node_handle_.advertise<sensor_msgs::JointState>("/laikago_joint_commad_tp",1);
+
     ROS_INFO("Build Lcm Hardware Interface ");
 }
 
@@ -53,6 +60,38 @@ bool RobotStateLcmHardwareInterface::Position_initCB(std_srvs::SetBool::Request&
       }
   return true;
 }
+
+bool RobotStateLcmHardwareInterface::Position_readfileCB(std_srvs::SetBool::Request& request,
+                                std_srvs::SetBool::Response& response)
+{
+    if(request.data == true){
+        laikago_position_readfile_buffer_ = true;
+        laikago_position_readfile_stop_buffer_ = false;
+        ROS_INFO("Start joint position readfile!!!!!!!!!!!!!!");
+    }
+    if(request.data == false){
+        laikago_position_readfile_buffer_ = false;
+       // laikago_position_readfile_stop_buffer_ = true;
+        ROS_INFO("STOP readfile joint position....");
+      }
+  return true;
+}
+
+bool RobotStateLcmHardwareInterface::Position_readfilestopCB(std_srvs::SetBool::Request& request,
+                                std_srvs::SetBool::Response& response)
+{
+    if(request.data == true){
+        laikago_position_readfile_stop_buffer_ = true;
+        laikago_position_readfile_buffer_ = false;
+        ROS_INFO("stop joint position readfile!!!!!!!!!!!!!!");
+    }
+    if(request.data == false){
+        laikago_position_readfile_stop_buffer_ = false;
+        ROS_INFO("do nothing........");
+      }
+  return true;
+}
+
 bool RobotStateLcmHardwareInterface::Position_stopCB(std_srvs::SetBool::Request& request,
                                 std_srvs::SetBool::Response& response)
 {
@@ -198,7 +237,10 @@ bool RobotStateLcmHardwareInterface::init(ros::NodeHandle &root_nh, ros::NodeHan
         ROS_INFO("Joint name is ====================== %s", joint_names_[j].c_str());
         const std::string& hardware_interface = joint_interfaces.front();
 
-                if(j==0||j==9){
+                if(j==0){
+                    joint_position_[j]=0.2;
+                }
+                if(j==9){
                     joint_position_[j]=0.2;
                 }
                 if(j==3||j==6){
@@ -233,10 +275,6 @@ bool RobotStateLcmHardwareInterface::init(ros::NodeHandle &root_nh, ros::NodeHan
                                                        &joint_effort_command_[j]);
         ej_interface_.registerHandle(joint_handle);
         robot_state_interface_.joint_effort_interfaces_.registerHandle(joint_handle);
-
-
-
-
 
         joint_handle = hardware_interface::JointHandle(js_interface_.getHandle(joint_names_[j]),
                                                        &joint_velocity_command_[j]);
@@ -298,16 +336,40 @@ void RobotStateLcmHardwareInterface::update_loop()
         rf_foot_contact_force_pub.publish(rf_contact_force);
         rh_foot_contact_force_pub.publish(rh_contact_force);
         lh_foot_contact_force_pub.publish(lh_contact_force);
+        all_leg_contact_state_pub.publish(footstate_);
+        joint_command_pub.publish(joint_command_to_print);
         usleep(2000); // 500HZ
     }
 
 }
 
 void RobotStateLcmHardwareInterface::getFootForces(laikago_msgs::LowState &low_state){
+
     rf_contact_force.wrench.force.z = low_state.footForce[0];
     lf_contact_force.wrench.force.z = low_state.footForce[1];
     rh_contact_force.wrench.force.z = low_state.footForce[2];
     lh_contact_force.wrench.force.z = low_state.footForce[3];
+
+    if(rf_contact_force.wrench.force.z>30){
+        footstate_.data[1]=1.0;
+    }else{
+        footstate_.data[1]=0.0;
+    }
+    if(lf_contact_force.wrench.force.z>30){
+        footstate_.data[0]=1.0;
+    }else{
+        footstate_.data[0]=0.0;
+    }
+    if(rh_contact_force.wrench.force.z>30){
+        footstate_.data[2]=1.0;
+    }else{
+        footstate_.data[2]=0.0;
+    }
+    if(lh_contact_force.wrench.force.z>30){
+        footstate_.data[3]=1.0;
+    }else{
+        footstate_.data[3]=0.0;
+    }
 }
 const sensor_msgs::Imu RobotStateLcmHardwareInterface::getImuMsgs(laikago_msgs::LowState &low_state)
 {
@@ -353,6 +415,33 @@ const sensor_msgs::JointState RobotStateLcmHardwareInterface::getJointStateMsgs(
 //    joint_state.name[9] = "RR_hip_joint";
 //    joint_state.name[10] = "RR_thigh_joint";
 //    joint_state.name[11] = "RR_calf_joint";
+
+    joint_command_to_print.header.frame_id = "base";
+    joint_command_to_print.header.stamp = ros::Time::now();
+    joint_command_to_print.name.resize(12);
+    joint_command_to_print.name[0] = "LF_HAA";
+    joint_command_to_print.name[1] = "LF_HFE";
+    joint_command_to_print.name[2] = "LF_KFE";
+    joint_command_to_print.name[3] = "RF_HAA";
+    joint_command_to_print.name[4] = "RF_HFE";
+    joint_command_to_print.name[5] = "RF_KFE";
+    joint_command_to_print.name[6] = "RH_HAA";
+    joint_command_to_print.name[7] = "RH_HFE";
+    joint_command_to_print.name[8] = "RH_KFE";
+    joint_command_to_print.name[9] = "LH_HAA";
+    joint_command_to_print.name[10] = "LH_HFE";
+    joint_command_to_print.name[11] = "LH_KFE";
+    joint_command_to_print.position.resize(12);
+    joint_command_to_print.velocity.resize(12);
+    joint_command_to_print.effort.resize(12);
+            for(unsigned int j = 0;j<12;j++)
+            {
+
+                        joint_command_to_print.position[j]=joint_position_command_[j];
+                        joint_command_to_print.velocity[j]=joint_velocity_command_[j];
+                        joint_command_to_print.effort[j]=joint_effort_command_[j];
+
+            }
 
     joint_state.name[0] = "LF_HAA";
     joint_state.name[1] = "LF_HFE";
@@ -474,6 +563,8 @@ void RobotStateLcmHardwareInterface::read(const ros::Time &time, const ros::Dura
    robot_state_data_.contact_pressure[3] = RecvLowROS.footForce[3];
 
 
+
+
     lock.unlock();
 }
 
@@ -487,6 +578,35 @@ bool RobotStateLcmHardwareInterface::Init_flag(){
 
     return false;
 }
+double RobotStateLcmHardwareInterface::moveAllPosition(double targetPos, double current_time, int j)
+{
+    //double current_pos; //= robot_state_data_.joint_position_read[j];
+    if(current_pos[j]==0||current_time>=4000){
+        current_pos[j]= robot_state_data_.joint_position_read[j];
+    }
+    //std::cout<<"current_pos   "<<current_pos[j]<<std::endl;
+    double percent,current_command;
+    double duration = 4000;
+    //for(int i=1; i<=duration; i++){
+        //if(!ros::ok()) break;
+    if(current_time>=duration){
+        current_command = targetPos;
+    }else{
+        percent = (double)current_time/duration;
+        current_command = current_pos[j]*(1-percent) + targetPos*percent;
+    }
+
+        //std::cout<<current_time<<std::endl;
+        //std::cout<<"targetPos   "<<targetPos<<std::endl;
+        //std::cout<<"current_command   "<<current_command<<std::endl;
+
+    //}
+//    if(current_command==targetPos){
+//        current_command==targetPos;
+//    }
+     return current_command;
+
+}
 void RobotStateLcmHardwareInterface::write(const ros::Time &time, const ros::Duration &period)
 {
     //ROS_INFO("Write Once");
@@ -494,22 +614,32 @@ void RobotStateLcmHardwareInterface::write(const ros::Time &time, const ros::Dur
     double currentPos, currentVel, calcTorque;
     torque_set.resize(12);
 
+//    std::cout<<"*******************************"<<std::endl;
+//    std::cout<<controller_name<<std::endl;
+////    std::cout<<contact_pressure[0]<<std::endl;
+////    std::cout<<contact_pressure[1]<<std::endl;
+////    std::cout<<contact_pressure[2]<<std::endl;
+////    std::cout<<contact_pressure[3]<<std::endl;
+//    std::cout<<"*******************************"<<std::endl;
     //MXR::NOTE: currently for reset(todo:button?)
 //    if(joint_position_command_[0]==0.5||joint_position_command_[1]==1.8||joint_position_command_[2]==-2.7){
 //        motiontime = 0;
 //    }
 
+
     //MXR:NOTE:  if we check the joint command,the joint_position_command is {0,0.67,-1.3}
 //        for(unsigned int j = 0;j<n_dof_;j++)
 //        {
 
-
-//            if(joint_position_command_[j]!=0||joint_effort_command_[j]!=0||joint_velocity_command_[j]!=0){
+//                   // joint_command_to_print.position[j]=joint_position_command_[j];
+//                   // joint_command_to_print.velocity[j]=joint_velocity_command_[j];
+//                    //joint_command_to_print.effort[j]=joint_effort_command_[j];
+//            //if(joint_position_command_[j]!=0||joint_effort_command_[j]!=0||joint_velocity_command_[j]!=0){
 //                std::cout<<"#############################"<<std::endl;
-//                std::cout<<controller_name<<std::endl;
+//                //std::cout<<controller_name<<std::endl;
 //                std::cout<<j<<"  "<<joint_position_command_[j]<<"  "<<joint_effort_command_[j]<<"  "<<joint_velocity_command_[j]<<std::endl;
 //                std::cout<<"#############################"<<std::endl;
-//            }
+//            //}
 
 
 //        }
@@ -637,11 +767,11 @@ void RobotStateLcmHardwareInterface::write(const ros::Time &time, const ros::Dur
         }
 
         if( motiontime == 3000){
-            //Kp[0] = 2.34; Kp[1] = 0.693; Kp[2] = 1.2;
-            Kp[0] = 80; Kp[1] = 50; Kp[2] = 50;
+            Kp[0] = 2.34; Kp[1] = 0.693; Kp[2] = 0.693;
             Kv[0] = 0.02; Kv[1] = 0.02; Kv[2] = 0.02;
         }
 
+        //gravity compensition 0.65f
 
         SendLowROS.motorCmd[FR_0].position = joint_position_command_[3];
         SendLowROS.motorCmd[FR_0].velocity = 0;
@@ -717,109 +847,389 @@ void RobotStateLcmHardwareInterface::write(const ros::Time &time, const ros::Dur
         SendLowROS.motorCmd[RL_2].torque = 0.0f;
     }
 
+//    std::cout<<motiontime<<std::endl;
+//    std::cout<<Init_flag()<<std::endl;
 ////MXR::NOTE: For set joint position
     if( motiontime >= 100&&!Init_flag()&&controller_name=="all_joints_position_group_controller"){
-        if( motiontime == 100){
-            Kp[0] = 0.232; Kp[1] = 0.032; Kp[2] = 0.032;
-            Kv[0] = 0.16; Kv[1] = 0.16; Kv[2] = 0.16;
-        }
+        //std::cout<<"!!!!!!!!!!!!!!!!!!!!!!!!1"<<std::endl;
+//        if( motiontime == 100){
+//            Kp[0] = 0.232; Kp[1] = 0.032; Kp[2] = 0.032;
+//            Kv[0] = 0.16; Kv[1] = 0.16; Kv[2] = 0.16;
+//        }
 
-        if( motiontime == 500){
-            Kp[0] = 0.52; Kp[1] = 0.062; Kp[2] = 0.062;
-            Kv[0] = 0.12; Kv[1] = 0.12; Kv[2] = 0.12;
-        }
+//        if( motiontime == 500){
+//            Kp[0] = 0.52; Kp[1] = 0.062; Kp[2] = 0.062;
+//            Kv[0] = 0.12; Kv[1] = 0.12; Kv[2] = 0.12;
+//        }
 
-        if( motiontime == 800){
-            Kp[0] = 0.92; Kp[1] = 0.092; Kp[2] = 0.092;
-            Kv[0] = 0.06; Kv[1] = 0.06; Kv[2] = 0.06;
-        }
+//        if( motiontime == 800){
+//            Kp[0] = 0.92; Kp[1] = 0.092; Kp[2] = 0.092;
+//            Kv[0] = 0.06; Kv[1] = 0.06; Kv[2] = 0.06;
+//        }
 
-        if( motiontime == 1300){
-            Kp[0] = 1.32; Kp[1] = 0.132; Kp[2] = 0.132;
+//        if( motiontime == 1300){
+//            Kp[0] = 1.32; Kp[1] = 0.132; Kp[2] = 0.132;
+//            Kv[0] = 0.02; Kv[1] = 0.02; Kv[2] = 0.02;
+//        }
+
+//        if( motiontime == 1600){
+//            Kp[0] = 1.84; Kp[1] = 0.363; Kp[2] = 0.363;
+//            Kv[0] = 0.02; Kv[1] = 0.02; Kv[2] = 0.02;
+//        }
+//        if( motiontime == 2000){
+        //mxr::note: this is tested for stand up(4s)
+            Kp[0] = 2.34; Kp[1] = 1.6; Kp[2] = 1.0;
             Kv[0] = 0.02; Kv[1] = 0.02; Kv[2] = 0.02;
+//        }
+
+            if(laikago_position_readfile_buffer_&&!laikago_position_readfile_stop_buffer_){
+                ROS_WARN_ONCE("entry this branch!!!!!!!!!!!!!!!!!!");
+                SendLowROS.motorCmd[FR_0].position = joint_position_command_[3];
+                SendLowROS.motorCmd[FR_0].velocity = 0;
+                SendLowROS.motorCmd[FR_0].positionStiffness = Kp[0];
+                SendLowROS.motorCmd[FR_0].velocityStiffness = Kv[0];
+                SendLowROS.motorCmd[FR_0].torque = -0.65f;
+
+                SendLowROS.motorCmd[FR_1].position = joint_position_command_[4];
+                SendLowROS.motorCmd[FR_1].velocity = 0;
+                SendLowROS.motorCmd[FR_1].positionStiffness = Kp[1];
+                SendLowROS.motorCmd[FR_1].velocityStiffness = Kv[1];
+                SendLowROS.motorCmd[FR_1].torque = 0.0f;
+
+                SendLowROS.motorCmd[FR_2].position =  joint_position_command_[5];
+                SendLowROS.motorCmd[FR_2].velocity = 0;
+                SendLowROS.motorCmd[FR_2].positionStiffness = Kp[2];
+                SendLowROS.motorCmd[FR_2].velocityStiffness = Kv[2];
+                SendLowROS.motorCmd[FR_2].torque = 0.0f;
+
+                SendLowROS.motorCmd[FL_0].position =  joint_position_command_[0];
+                SendLowROS.motorCmd[FL_0].velocity = 0;
+                SendLowROS.motorCmd[FL_0].positionStiffness = Kp[0];
+                SendLowROS.motorCmd[FL_0].velocityStiffness = Kv[0];
+                SendLowROS.motorCmd[FL_0].torque = 0.65f;
+
+                SendLowROS.motorCmd[FL_1].position =  joint_position_command_[1];
+                SendLowROS.motorCmd[FL_1].velocity = 0;
+                SendLowROS.motorCmd[FL_1].positionStiffness = Kp[1];
+                SendLowROS.motorCmd[FL_1].velocityStiffness = Kv[1];
+                SendLowROS.motorCmd[FL_1].torque = 0.0f;
+
+                SendLowROS.motorCmd[FL_2].position =  joint_position_command_[2];
+                SendLowROS.motorCmd[FL_2].velocity = 0;
+                SendLowROS.motorCmd[FL_2].positionStiffness = Kp[2];
+                SendLowROS.motorCmd[FL_2].velocityStiffness = Kv[2];
+                SendLowROS.motorCmd[FL_2].torque = 0.0f;
+
+                SendLowROS.motorCmd[RR_0].position = joint_position_command_[6];
+                SendLowROS.motorCmd[RR_0].velocity = 0;
+                SendLowROS.motorCmd[RR_0].positionStiffness = Kp[0];
+                SendLowROS.motorCmd[RR_0].velocityStiffness = Kv[0];
+                SendLowROS.motorCmd[RR_0].torque = -0.65f;
+
+                SendLowROS.motorCmd[RR_1].position = joint_position_command_[7];
+                SendLowROS.motorCmd[RR_1].velocity = 0;
+                SendLowROS.motorCmd[RR_1].positionStiffness = Kp[1];
+                SendLowROS.motorCmd[RR_1].velocityStiffness = Kv[1];
+                SendLowROS.motorCmd[RR_1].torque = 0.0f;
+
+                SendLowROS.motorCmd[RR_2].position =  joint_position_command_[8];
+                SendLowROS.motorCmd[RR_2].velocity = 0;
+                SendLowROS.motorCmd[RR_2].positionStiffness = Kp[2];
+                SendLowROS.motorCmd[RR_2].velocityStiffness = Kv[2];
+                SendLowROS.motorCmd[RR_2].torque = 0.0f;
+
+
+                SendLowROS.motorCmd[RL_0].position = joint_position_command_[9];
+                SendLowROS.motorCmd[RL_0].velocity = 0;
+                SendLowROS.motorCmd[RL_0].positionStiffness = Kp[0];
+                SendLowROS.motorCmd[RL_0].velocityStiffness = Kv[0];
+                SendLowROS.motorCmd[RL_0].torque = 0.65f;
+
+                SendLowROS.motorCmd[RL_1].position = joint_position_command_[10];
+                SendLowROS.motorCmd[RL_1].velocity = 0;
+                SendLowROS.motorCmd[RL_1].positionStiffness = Kp[1];
+                SendLowROS.motorCmd[RL_1].velocityStiffness = Kv[1];
+                SendLowROS.motorCmd[RL_1].torque = 0.0f;
+
+                SendLowROS.motorCmd[RL_2].position =  joint_position_command_[11];
+                SendLowROS.motorCmd[RL_2].velocity = 0;
+                SendLowROS.motorCmd[RL_2].positionStiffness = Kp[2];
+                SendLowROS.motorCmd[RL_2].velocityStiffness = Kv[2];
+                SendLowROS.motorCmd[RL_2].torque = 0.0f;
+            }else{
+                ROS_WARN_ONCE("entry another branch!!!!!!!!!!!!!!!!!!");
+                SendLowROS.motorCmd[FR_0].position = moveAllPosition(joint_position_command_[3],motiontime,3);
+                SendLowROS.motorCmd[FR_0].velocity = 0;
+                SendLowROS.motorCmd[FR_0].positionStiffness = Kp[0];
+                SendLowROS.motorCmd[FR_0].velocityStiffness = Kv[0];
+                SendLowROS.motorCmd[FR_0].torque = -0.65f;
+
+                SendLowROS.motorCmd[FR_1].position = moveAllPosition(joint_position_command_[4],motiontime,4);
+                SendLowROS.motorCmd[FR_1].velocity = 0;
+                SendLowROS.motorCmd[FR_1].positionStiffness = Kp[1];
+                SendLowROS.motorCmd[FR_1].velocityStiffness = Kv[1];
+                SendLowROS.motorCmd[FR_1].torque = 0.0f;
+
+                SendLowROS.motorCmd[FR_2].position =  moveAllPosition(joint_position_command_[5],motiontime,5);
+                SendLowROS.motorCmd[FR_2].velocity = 0;
+                SendLowROS.motorCmd[FR_2].positionStiffness = Kp[2];
+                SendLowROS.motorCmd[FR_2].velocityStiffness = Kv[2];
+                SendLowROS.motorCmd[FR_2].torque = 0.0f;
+
+                SendLowROS.motorCmd[FL_0].position =  moveAllPosition(joint_position_command_[0],motiontime,0);
+                SendLowROS.motorCmd[FL_0].velocity = 0;
+                SendLowROS.motorCmd[FL_0].positionStiffness = Kp[0];
+                SendLowROS.motorCmd[FL_0].velocityStiffness = Kv[0];
+                SendLowROS.motorCmd[FL_0].torque = 0.65f;
+
+                SendLowROS.motorCmd[FL_1].position =  moveAllPosition(joint_position_command_[1],motiontime,1);
+                SendLowROS.motorCmd[FL_1].velocity = 0;
+                SendLowROS.motorCmd[FL_1].positionStiffness = Kp[1];
+                SendLowROS.motorCmd[FL_1].velocityStiffness = Kv[1];
+                SendLowROS.motorCmd[FL_1].torque = 0.0f;
+
+                SendLowROS.motorCmd[FL_2].position =  moveAllPosition(joint_position_command_[2],motiontime,2);
+                SendLowROS.motorCmd[FL_2].velocity = 0;
+                SendLowROS.motorCmd[FL_2].positionStiffness = Kp[2];
+                SendLowROS.motorCmd[FL_2].velocityStiffness = Kv[2];
+                SendLowROS.motorCmd[FL_2].torque = 0.0f;
+
+                SendLowROS.motorCmd[RR_0].position = moveAllPosition(joint_position_command_[6],motiontime,6);
+                SendLowROS.motorCmd[RR_0].velocity = 0;
+                SendLowROS.motorCmd[RR_0].positionStiffness = Kp[0];
+                SendLowROS.motorCmd[RR_0].velocityStiffness = Kv[0];
+                SendLowROS.motorCmd[RR_0].torque = -0.65f;
+
+                SendLowROS.motorCmd[RR_1].position = moveAllPosition(joint_position_command_[7],motiontime,7);
+                SendLowROS.motorCmd[RR_1].velocity = 0;
+                SendLowROS.motorCmd[RR_1].positionStiffness = Kp[1];
+                SendLowROS.motorCmd[RR_1].velocityStiffness = Kv[1];
+                SendLowROS.motorCmd[RR_1].torque = 0.0f;
+
+                SendLowROS.motorCmd[RR_2].position =  moveAllPosition(joint_position_command_[8],motiontime,8);
+                SendLowROS.motorCmd[RR_2].velocity = 0;
+                SendLowROS.motorCmd[RR_2].positionStiffness = Kp[2];
+                SendLowROS.motorCmd[RR_2].velocityStiffness = Kv[2];
+                SendLowROS.motorCmd[RR_2].torque = 0.0f;
+
+
+                SendLowROS.motorCmd[RL_0].position = moveAllPosition(joint_position_command_[9],motiontime,9);
+                SendLowROS.motorCmd[RL_0].velocity = 0;
+                SendLowROS.motorCmd[RL_0].positionStiffness = Kp[0];
+                SendLowROS.motorCmd[RL_0].velocityStiffness = Kv[0];
+                SendLowROS.motorCmd[RL_0].torque = 0.65f;
+
+                SendLowROS.motorCmd[RL_1].position = moveAllPosition(joint_position_command_[10],motiontime,10);
+                SendLowROS.motorCmd[RL_1].velocity = 0;
+                SendLowROS.motorCmd[RL_1].positionStiffness = Kp[1];
+                SendLowROS.motorCmd[RL_1].velocityStiffness = Kv[1];
+                SendLowROS.motorCmd[RL_1].torque = 0.0f;
+
+                SendLowROS.motorCmd[RL_2].position =  moveAllPosition(joint_position_command_[11],motiontime,11);
+                SendLowROS.motorCmd[RL_2].velocity = 0;
+                SendLowROS.motorCmd[RL_2].positionStiffness = Kp[2];
+                SendLowROS.motorCmd[RL_2].velocityStiffness = Kv[2];
+                SendLowROS.motorCmd[RL_2].torque = 0.0f;
+            }
+
+
+    }
+
+//#################################laikago_control###################################################
+    if(controller_name=="laikago_controller"){
+
+//        ROS_WARN_ONCE("joint effort command[3] published!!!");
+//        if(joint_effort_command_[3]>20.0){
+//            joint_effort_command_[3]=20.0;
+//        }
+//        if(joint_effort_command_[3]<-20.0){
+//            joint_effort_command_[3]=-20.0;
+//        }
+//        //              std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+//        //              std::cout<<joint_effort_command_[3]<<std::endl;
+//        //              std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+//        SendLowROS.motorCmd[FR_0].position = PosStopF;
+//        SendLowROS.motorCmd[FR_0].velocity = VelStopF;
+//        SendLowROS.motorCmd[FR_0].positionStiffness = 0;
+//        SendLowROS.motorCmd[FR_0].velocityStiffness = 0;
+//        SendLowROS.motorCmd[FR_0].torque = joint_effort_command_[3];
+
+//        ROS_WARN_ONCE("joint effort command[4] published!!!");
+//        if(joint_effort_command_[4]>20.0){
+//            joint_effort_command_[4]=20.0;
+//        }
+//        if(joint_effort_command_[4]<-20.0){
+//            joint_effort_command_[4]=-20.0;
+//        }
+//        //              std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+//        //              std::cout<<joint_effort_command_[4]<<std::endl;
+//        //              std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+//        SendLowROS.motorCmd[FR_1].position = PosStopF;
+//        SendLowROS.motorCmd[FR_1].velocity = VelStopF;
+//        SendLowROS.motorCmd[FR_1].positionStiffness = 0;
+//        SendLowROS.motorCmd[FR_1].velocityStiffness = 0;
+//        SendLowROS.motorCmd[FR_1].torque = joint_effort_command_[4];
+
+        ROS_WARN_ONCE("joint effort command[5] published!!!");
+        if(joint_effort_command_[5]>25.0){
+            joint_effort_command_[5]=25.0;
         }
-
-        if( motiontime == 1600){
-            Kp[0] = 1.84; Kp[1] = 0.363; Kp[2] = 0.363;
-            Kv[0] = 0.02; Kv[1] = 0.02; Kv[2] = 0.02;
+        if(joint_effort_command_[5]<-25.0){
+            joint_effort_command_[5]=-25.0;
         }
-        if( motiontime == 2000){
-            Kp[0] = 2.34; Kp[1] = 0.693; Kp[2] = 0.693;
-            Kv[0] = 0.02; Kv[1] = 0.02; Kv[2] = 0.02;
+        //std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+        //std::cout<<joint_effort_command_[5]<<std::endl;
+        //std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+        SendLowROS.motorCmd[FR_2].position = PosStopF;
+        SendLowROS.motorCmd[FR_2].velocity = VelStopF;
+        SendLowROS.motorCmd[FR_2].positionStiffness = 0;
+        SendLowROS.motorCmd[FR_2].velocityStiffness = 0;
+        SendLowROS.motorCmd[FR_2].torque = joint_effort_command_[5];
+
+//        ROS_WARN_ONCE("joint effort command[6] published!!!");
+//        if(joint_effort_command_[6]>20.0){
+//            joint_effort_command_[6]=20.0;
+//        }
+//        if(joint_effort_command_[6]<-20.0){
+//            joint_effort_command_[6]=-20.0;
+//        }
+//        //std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+//        //std::cout<<joint_effort_command_[6]<<std::endl;
+//        //std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+//        SendLowROS.motorCmd[RR_0].position = PosStopF;
+//        SendLowROS.motorCmd[RR_0].velocity = VelStopF;
+//        SendLowROS.motorCmd[RR_0].positionStiffness = 0;
+//        SendLowROS.motorCmd[RR_0].velocityStiffness = 0;
+//        SendLowROS.motorCmd[RR_0].torque = joint_effort_command_[6];
+
+//        ROS_WARN_ONCE("joint effort command[7] published!!!");
+//        if(joint_effort_command_[7]>20.0){
+//            joint_effort_command_[7]=20.0;
+//        }
+//        if(joint_effort_command_[7]<-20.0){
+//            joint_effort_command_[7]=-20.0;
+//        }
+//        //std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+//        //std::cout<<joint_effort_command_[7]<<std::endl;
+//        //std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+//        SendLowROS.motorCmd[RR_1].position = PosStopF;
+//        SendLowROS.motorCmd[RR_1].velocity = VelStopF;
+//        SendLowROS.motorCmd[RR_1].positionStiffness = 0;
+//        SendLowROS.motorCmd[RR_1].velocityStiffness = 0;
+//        SendLowROS.motorCmd[RR_1].torque = joint_effort_command_[7];
+
+        ROS_WARN_ONCE("joint effort command[8] published!!!");
+        if(joint_effort_command_[8]>25.0){
+            joint_effort_command_[8]=25.0;
         }
+        if(joint_effort_command_[8]<-25.0){
+            joint_effort_command_[8]=-25.0;
+        }
+        //std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+        //std::cout<<joint_effort_command_[8]<<std::endl;
+        //std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+        SendLowROS.motorCmd[RR_2].position = PosStopF;
+        SendLowROS.motorCmd[RR_2].velocity = VelStopF;
+        SendLowROS.motorCmd[RR_2].positionStiffness = 0;
+        SendLowROS.motorCmd[RR_2].velocityStiffness = 0;
+        SendLowROS.motorCmd[RR_2].torque = joint_effort_command_[8];
 
-        SendLowROS.motorCmd[FR_0].position = joint_position_command_[3];
-        SendLowROS.motorCmd[FR_0].velocity = 0;
-        SendLowROS.motorCmd[FR_0].positionStiffness = Kp[0];
-        SendLowROS.motorCmd[FR_0].velocityStiffness = Kv[0];
-        SendLowROS.motorCmd[FR_0].torque = -0.65f;
+//        ROS_WARN_ONCE("joint effort command[0] published!!!");
+//        if(joint_effort_command_[0]>20.0){
+//            joint_effort_command_[0]=20.0;
+//        }
+//        if(joint_effort_command_[0]<-20.0){
+//            joint_effort_command_[0]=-20.0;
+//        }
+////        std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+////        std::cout<<joint_effort_command_[0]<<std::endl;
+////        std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+//        SendLowROS.motorCmd[FL_0].position = PosStopF;
+//        SendLowROS.motorCmd[FL_0].velocity = VelStopF;
+//        SendLowROS.motorCmd[FL_0].positionStiffness = 0;
+//        SendLowROS.motorCmd[FL_0].velocityStiffness = 0;
+//        SendLowROS.motorCmd[FL_0].torque = joint_effort_command_[0];
 
-        SendLowROS.motorCmd[FR_1].position = joint_position_command_[4];
-        SendLowROS.motorCmd[FR_1].velocity = 0;
-        SendLowROS.motorCmd[FR_1].positionStiffness = Kp[1];
-        SendLowROS.motorCmd[FR_1].velocityStiffness = Kv[1];
-        SendLowROS.motorCmd[FR_1].torque = 0.0f;
+//        ROS_WARN_ONCE("joint effort command[1] published!!!");
+//        if(joint_effort_command_[1]>20.0){
+//            joint_effort_command_[1]=20.0;
+//        }
+//        if(joint_effort_command_[1]<-20.0){
+//            joint_effort_command_[1]=-20.0;
+//        }
+////        std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+////        std::cout<<joint_effort_command_[1]<<std::endl;
+////        std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+//        SendLowROS.motorCmd[FL_1].position = PosStopF;
+//        SendLowROS.motorCmd[FL_1].velocity = VelStopF;
+//        SendLowROS.motorCmd[FL_1].positionStiffness = 0;
+//        SendLowROS.motorCmd[FL_1].velocityStiffness = 0;
+//        SendLowROS.motorCmd[FL_1].torque = joint_effort_command_[1];
 
-        SendLowROS.motorCmd[FR_2].position =  joint_position_command_[5];
-        SendLowROS.motorCmd[FR_2].velocity = 0;
-        SendLowROS.motorCmd[FR_2].positionStiffness = Kp[2];
-        SendLowROS.motorCmd[FR_2].velocityStiffness = Kv[2];
-        SendLowROS.motorCmd[FR_2].torque = 0.0f;
+        ROS_WARN_ONCE("joint effort command[2] published!!!");
+        if(joint_effort_command_[2]>25.0){
+            joint_effort_command_[2]=25.0;
+        }
+        if(joint_effort_command_[2]<-25.0){
+            joint_effort_command_[2]=-25.0;
+        }
+//        std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+//        std::cout<<joint_effort_command_[2]<<std::endl;
+//        std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+        SendLowROS.motorCmd[FL_2].position = PosStopF;
+        SendLowROS.motorCmd[FL_2].velocity = VelStopF;
+        SendLowROS.motorCmd[FL_2].positionStiffness = 0;
+        SendLowROS.motorCmd[FL_2].velocityStiffness = 0;
+        SendLowROS.motorCmd[FL_2].torque = joint_effort_command_[2];
 
-        SendLowROS.motorCmd[FL_0].position = joint_position_command_[0];
-        SendLowROS.motorCmd[FL_0].velocity = 0;
-        SendLowROS.motorCmd[FL_0].positionStiffness = Kp[0];
-        SendLowROS.motorCmd[FL_0].velocityStiffness = Kv[0];
-        SendLowROS.motorCmd[FL_0].torque = 0.65f;
+//        ROS_WARN_ONCE("joint effort command[9] published!!!");
+//        if(joint_effort_command_[9]>20.0){
+//            joint_effort_command_[9]=20.0;
+//        }
+//        if(joint_effort_command_[9]<-20.0){
+//            joint_effort_command_[9]=-20.0;
+//        }
+////        std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+////        std::cout<<joint_effort_command_[9]<<std::endl;
+////        std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+//        SendLowROS.motorCmd[RL_0].position = PosStopF;
+//        SendLowROS.motorCmd[RL_0].velocity = VelStopF;
+//        SendLowROS.motorCmd[RL_0].positionStiffness = 0;
+//        SendLowROS.motorCmd[RL_0].velocityStiffness = 0;
+//        SendLowROS.motorCmd[RL_0].torque = joint_effort_command_[9];
 
-        SendLowROS.motorCmd[FL_1].position = joint_position_command_[1];
-        SendLowROS.motorCmd[FL_1].velocity = 0;
-        SendLowROS.motorCmd[FL_1].positionStiffness = Kp[1];
-        SendLowROS.motorCmd[FL_1].velocityStiffness = Kv[1];
-        SendLowROS.motorCmd[FL_1].torque = 0.0f;
+//        ROS_WARN_ONCE("joint effort command[10] published!!!");
+//        if(joint_effort_command_[10]>20.0){
+//            joint_effort_command_[10]=20.0;
+//        }
+//        if(joint_effort_command_[10]<-20.0){
+//            joint_effort_command_[10]=-20.0;
+//        }
+////        std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+////        std::cout<<joint_effort_command_[10]<<std::endl;
+////        std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+//        SendLowROS.motorCmd[RL_1].position = PosStopF;
+//        SendLowROS.motorCmd[RL_1].velocity = VelStopF;
+//        SendLowROS.motorCmd[RL_1].positionStiffness = 0;
+//        SendLowROS.motorCmd[RL_1].velocityStiffness = 0;
+//        SendLowROS.motorCmd[RL_1].torque = joint_effort_command_[10];
 
-        SendLowROS.motorCmd[FL_2].position =  joint_position_command_[2];
-        SendLowROS.motorCmd[FL_2].velocity = 0;
-        SendLowROS.motorCmd[FL_2].positionStiffness = Kp[2];
-        SendLowROS.motorCmd[FL_2].velocityStiffness = Kv[2];
-        SendLowROS.motorCmd[FL_2].torque = 0.0f;
+        ROS_WARN_ONCE("joint effort command[11] published!!!");
+        if(joint_effort_command_[11]>25.0){
+            joint_effort_command_[11]=25.0;
+        }
+        if(joint_effort_command_[11]<-25.0){
+            joint_effort_command_[11]=-25.0;
+        }
+//        std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+//        std::cout<<joint_effort_command_[11]<<std::endl;
+//        std::cout<<"@@@@@@@@@@@@@@@@@@@@@"<<std::endl;
+        SendLowROS.motorCmd[RL_2].position = PosStopF;
+        SendLowROS.motorCmd[RL_2].velocity = VelStopF;
+        SendLowROS.motorCmd[RL_2].positionStiffness = 0;
+        SendLowROS.motorCmd[RL_2].velocityStiffness = 0;
+        SendLowROS.motorCmd[RL_2].torque = joint_effort_command_[11];
 
-        SendLowROS.motorCmd[RR_0].position = joint_position_command_[6];
-        SendLowROS.motorCmd[RR_0].velocity = 0;
-        SendLowROS.motorCmd[RR_0].positionStiffness = Kp[0];
-        SendLowROS.motorCmd[RR_0].velocityStiffness = Kv[0];
-        SendLowROS.motorCmd[RR_0].torque = -0.65f;
-
-        SendLowROS.motorCmd[RR_1].position = joint_position_command_[7];
-        SendLowROS.motorCmd[RR_1].velocity = 0;
-        SendLowROS.motorCmd[RR_1].positionStiffness = Kp[1];
-        SendLowROS.motorCmd[RR_1].velocityStiffness = Kv[1];
-        SendLowROS.motorCmd[RR_1].torque = 0.0f;
-
-        SendLowROS.motorCmd[RR_2].position =  joint_position_command_[8];
-        SendLowROS.motorCmd[RR_2].velocity = 0;
-        SendLowROS.motorCmd[RR_2].positionStiffness = Kp[2];
-        SendLowROS.motorCmd[RR_2].velocityStiffness = Kv[2];
-        SendLowROS.motorCmd[RR_2].torque = 0.0f;
-
-
-        SendLowROS.motorCmd[RL_0].position = joint_position_command_[9];
-        SendLowROS.motorCmd[RL_0].velocity = 0;
-        SendLowROS.motorCmd[RL_0].positionStiffness = Kp[0];
-        SendLowROS.motorCmd[RL_0].velocityStiffness = Kv[0];
-        SendLowROS.motorCmd[RL_0].torque = 0.65f;
-
-        SendLowROS.motorCmd[RL_1].position = joint_position_command_[10];
-        SendLowROS.motorCmd[RL_1].velocity = 0;
-        SendLowROS.motorCmd[RL_1].positionStiffness = Kp[1];
-        SendLowROS.motorCmd[RL_1].velocityStiffness = Kv[1];
-        SendLowROS.motorCmd[RL_1].torque = 0.0f;
-
-        SendLowROS.motorCmd[RL_2].position =  joint_position_command_[11];
-        SendLowROS.motorCmd[RL_2].velocity = 0;
-        SendLowROS.motorCmd[RL_2].positionStiffness = Kp[2];
-        SendLowROS.motorCmd[RL_2].velocityStiffness = Kv[2];
-        SendLowROS.motorCmd[RL_2].torque = 0.0f;
     }
 //##############################(torque_control)######################################################
 //         SendLowROS.motorCmd[FL_0].position = PosStopF;
@@ -839,148 +1249,174 @@ void RobotStateLcmHardwareInterface::write(const ros::Time &time, const ros::Dur
 //         SendLowROS.motorCmd[FL_2].positionStiffness = 0;
 //         SendLowROS.motorCmd[FL_2].velocityStiffness = 0;
 //         SendLowROS.motorCmd[FL_2].torque =torque_set[2];
-    if(!Init_flag()&&controller_name=="base_balance_controller"){
+    if(controller_name=="base_balance_controller"){
+
+          ROS_WARN_ONCE("joint effort command[3] published!!!");
+                if(joint_effort_command_[3]>20.0){
+                    joint_effort_command_[3]=20.0;
+                }
+                if(joint_effort_command_[3]<-20.0){
+                    joint_effort_command_[3]=-20.0;
+                }
+
+                 SendLowROS.motorCmd[FR_0].position = PosStopF;
+                 SendLowROS.motorCmd[FR_0].velocity = VelStopF;
+                 SendLowROS.motorCmd[FR_0].positionStiffness = 0;
+                 SendLowROS.motorCmd[FR_0].velocityStiffness = 0;
+                 SendLowROS.motorCmd[FR_0].torque =joint_effort_command_[3];
+
+        ROS_WARN_ONCE("joint effort command[4] published!!!");
+                 if(joint_effort_command_[4]>20.0){
+                     joint_effort_command_[4]=20.0;
+                 }
+                 if(joint_effort_command_[4]<-20.0){
+                     joint_effort_command_[4]=-20.0;
+                 }
+
+                  SendLowROS.motorCmd[FR_1].position = PosStopF;
+                  SendLowROS.motorCmd[FR_1].velocity = VelStopF;
+                  SendLowROS.motorCmd[FR_1].positionStiffness = 0;
+                  SendLowROS.motorCmd[FR_1].velocityStiffness = 0;
+                  SendLowROS.motorCmd[FR_1].torque =joint_effort_command_[4];
+
+          ROS_WARN_ONCE("joint effort command[5] published!!!");
+                  if(joint_effort_command_[5]>30.0){
+                      joint_effort_command_[5]=30.0;
+                  }
+                  if(joint_effort_command_[5]<-30.0){
+                      joint_effort_command_[5]=-30.0;
+                  }
+
+                   SendLowROS.motorCmd[FR_2].position = PosStopF;
+                   SendLowROS.motorCmd[FR_2].velocity = VelStopF;
+                   SendLowROS.motorCmd[FR_2].positionStiffness = 0;
+                   SendLowROS.motorCmd[FR_2].velocityStiffness = 0;
+                   SendLowROS.motorCmd[FR_2].torque =joint_effort_command_[5];
 
 
-//                if(joint_effort_command_[3]>5.0){
-//                    joint_effort_command_[3]=5.0;
-//                }
-//                if(joint_effort_command_[3]<-5.0){
-//                    joint_effort_command_[3]=-5.0;
-//                }
+        ROS_WARN_ONCE("joint effort command[0] published!!!");
+        if(joint_effort_command_[0]>20.0){
+            joint_effort_command_[0]=20.0;
+        }
+        if(joint_effort_command_[0]<-20.0){
+            joint_effort_command_[0]=-20.0;
+        }
 
-//                 SendLowROS.motorCmd[FR_0].position = PosStopF;
-//                 SendLowROS.motorCmd[FR_0].velocity = VelStopF;
-//                 SendLowROS.motorCmd[FR_0].positionStiffness = 0;
-//                 SendLowROS.motorCmd[FR_0].velocityStiffness = 0;
-//                 SendLowROS.motorCmd[FR_0].torque =joint_effort_command_[3];
+         SendLowROS.motorCmd[FL_0].position = PosStopF;
+         SendLowROS.motorCmd[FL_0].velocity = VelStopF;
+         SendLowROS.motorCmd[FL_0].positionStiffness = 0;
+         SendLowROS.motorCmd[FL_0].velocityStiffness = 0;
+         SendLowROS.motorCmd[FL_0].torque =joint_effort_command_[0];
 
-//        if(joint_effort_command_[4]>5.0){
-//            joint_effort_command_[4]=5.0;
-//        }
-//        if(joint_effort_command_[4]<-5.0){
-//            joint_effort_command_[4]=-5.0;
-//        }
+        ROS_WARN_ONCE("joint effort command[1] published!!!");
+                 if(joint_effort_command_[1]>20.0){
+                     joint_effort_command_[1]=20.0;
+                 }
+                 if(joint_effort_command_[1]<-20.0){
+                     joint_effort_command_[1]=-20.0;
+                 }
 
-//         SendLowROS.motorCmd[FR_1].position = PosStopF;
-//         SendLowROS.motorCmd[FR_1].velocity = VelStopF;
-//         SendLowROS.motorCmd[FR_1].positionStiffness = 0;
-//         SendLowROS.motorCmd[FR_1].velocityStiffness = 0;
-//         SendLowROS.motorCmd[FR_1].torque =joint_effort_command_[4];
+                  SendLowROS.motorCmd[FL_1].position = PosStopF;
+                  SendLowROS.motorCmd[FL_1].velocity = VelStopF;
+                  SendLowROS.motorCmd[FL_1].positionStiffness = 0;
+                  SendLowROS.motorCmd[FL_1].velocityStiffness = 0;
+                  SendLowROS.motorCmd[FL_1].torque =joint_effort_command_[1];
+
+         ROS_WARN_ONCE("joint effort command[2] published!!!");
+         if(joint_effort_command_[2]>30.0){
+             joint_effort_command_[2]=30.0;
+         }
+         if(joint_effort_command_[2]<-30.0){
+             joint_effort_command_[2]=-30.0;
+         }
+
+          SendLowROS.motorCmd[FL_2].position = PosStopF;
+          SendLowROS.motorCmd[FL_2].velocity = VelStopF;
+          SendLowROS.motorCmd[FL_2].positionStiffness = 0;
+          SendLowROS.motorCmd[FL_2].velocityStiffness = 0;
+          SendLowROS.motorCmd[FL_2].torque =joint_effort_command_[2];
 
 
-//        if(joint_effort_command_[5]>5.0){
-//            joint_effort_command_[5]=5.0;
-//        }
-//        if(joint_effort_command_[5]<-5.0){
-//            joint_effort_command_[5]=-5.0;
-//        }
+        ROS_WARN_ONCE("joint effort command[6] published!!!");
+        if(joint_effort_command_[6]>20.0){
+            joint_effort_command_[6]=20.0;
+        }
+        if(joint_effort_command_[6]<-20.0){
+            joint_effort_command_[6]=-20.0;
+        }
 
-//         SendLowROS.motorCmd[FR_2].position = PosStopF;
-//         SendLowROS.motorCmd[FR_2].velocity = VelStopF;
-//         SendLowROS.motorCmd[FR_2].positionStiffness = 0;
-//         SendLowROS.motorCmd[FR_2].velocityStiffness = 0;
-//         SendLowROS.motorCmd[FR_2].torque =joint_effort_command_[5];
+         SendLowROS.motorCmd[RR_0].position = PosStopF;
+         SendLowROS.motorCmd[RR_0].velocity = VelStopF;
+         SendLowROS.motorCmd[RR_0].positionStiffness = 0;
+         SendLowROS.motorCmd[RR_0].velocityStiffness = 0;
+         SendLowROS.motorCmd[RR_0].torque =joint_effort_command_[6];
 
-//        if(joint_effort_command_[0]>5.0){
-//            joint_effort_command_[0]=5.0;
-//        }
-//        if(joint_effort_command_[0]<-5.0){
-//            joint_effort_command_[0]=-5.0;
-//        }
+         ROS_WARN_ONCE("joint effort command[7] published!!!");
+         if(joint_effort_command_[7]>20.0){
+             joint_effort_command_[7]=20.0;
+         }
+         if(joint_effort_command_[7]<-20.0){
+             joint_effort_command_[7]=-20.0;
+         }
+         SendLowROS.motorCmd[RR_1].position = PosStopF;
+         SendLowROS.motorCmd[RR_1].velocity = VelStopF;
+         SendLowROS.motorCmd[RR_1].positionStiffness = 0;
+         SendLowROS.motorCmd[RR_1].velocityStiffness = 0;
+         SendLowROS.motorCmd[RR_1].torque =joint_effort_command_[7];
 
-//         SendLowROS.motorCmd[FL_0].position = PosStopF;
-//         SendLowROS.motorCmd[FL_0].velocity = VelStopF;
-//         SendLowROS.motorCmd[FL_0].positionStiffness = 0;
-//         SendLowROS.motorCmd[FL_0].velocityStiffness = 0;
-//         SendLowROS.motorCmd[FL_0].torque =joint_effort_command_[0];
+         ROS_WARN_ONCE("joint effort command[8] published!!!");
+         if(joint_effort_command_[8]>30.0){
+             joint_effort_command_[8]=30.0;
+         }
+         if(joint_effort_command_[8]<-30.0){
+             joint_effort_command_[8]=-30.0;
+         }
+         SendLowROS.motorCmd[RR_2].position = PosStopF;
+         SendLowROS.motorCmd[RR_2].velocity = VelStopF;
+         SendLowROS.motorCmd[RR_2].positionStiffness = 0;
+         SendLowROS.motorCmd[RR_2].velocityStiffness = 0;
+         SendLowROS.motorCmd[RR_2].torque =joint_effort_command_[8];
 
-//                 if(joint_effort_command_[1]>5.0){
-//                     joint_effort_command_[1]=5.0;
-//                 }
-//                 if(joint_effort_command_[1]<-5.0){
-//                     joint_effort_command_[1]=-5.0;
-//                 }
+         ROS_WARN_ONCE("joint effort command[9] published!!!");
+         if(joint_effort_command_[9]>20.0){
+             joint_effort_command_[9]=20.0;
+         }
+         if(joint_effort_command_[9]<-20.0){
+             joint_effort_command_[9]=-20.0;
+         }
+         SendLowROS.motorCmd[RL_0].position = PosStopF;
+         SendLowROS.motorCmd[RL_0].velocity = VelStopF;
+         SendLowROS.motorCmd[RL_0].positionStiffness = 0;
+         SendLowROS.motorCmd[RL_0].velocityStiffness = 0;
+         SendLowROS.motorCmd[RL_0].torque =joint_effort_command_[9];
 
-//                  SendLowROS.motorCmd[FL_1].position = PosStopF;
-//                  SendLowROS.motorCmd[FL_1].velocity = VelStopF;
-//                  SendLowROS.motorCmd[FL_1].positionStiffness = 0;
-//                  SendLowROS.motorCmd[FL_1].velocityStiffness = 0;
-//                  SendLowROS.motorCmd[FL_1].torque =joint_effort_command_[1];
-//         if(joint_effort_command_[2]>5.0){
-//             joint_effort_command_[2]=5.0;
-//         }
-//         if(joint_effort_command_[2]<-5.0){
-//             joint_effort_command_[2]=-5.0;
-//         }
+         ROS_WARN_ONCE("joint effort command[10] published!!!");
+         if(joint_effort_command_[10]>20.0){
+             joint_effort_command_[10]=20.0;
+         }
+         if(joint_effort_command_[10]<-20.0){
+             joint_effort_command_[10]=-20.0;
+         }
+         SendLowROS.motorCmd[RL_1].position = PosStopF;
+         SendLowROS.motorCmd[RL_1].velocity = VelStopF;
+         SendLowROS.motorCmd[RL_1].positionStiffness = 0;
+         SendLowROS.motorCmd[RL_1].velocityStiffness = 0;
+         SendLowROS.motorCmd[RL_1].torque =joint_effort_command_[10];
 
-//          SendLowROS.motorCmd[FL_2].position = PosStopF;
-//          SendLowROS.motorCmd[FL_2].velocity = VelStopF;
-//          SendLowROS.motorCmd[FL_2].positionStiffness = 0;
-//          SendLowROS.motorCmd[FL_2].velocityStiffness = 0;
-//          SendLowROS.motorCmd[FL_2].torque =joint_effort_command_[2];
+         ROS_WARN_ONCE("joint effort command[11] published!!!");
+         if(joint_effort_command_[11]>30.0){
+             joint_effort_command_[11]=30.0;
+         }
+         if(joint_effort_command_[11]<-30.0){
+             joint_effort_command_[11]=-30.0;
+         }
+         SendLowROS.motorCmd[RL_2].position = PosStopF;
+         SendLowROS.motorCmd[RL_2].velocity = VelStopF;
+         SendLowROS.motorCmd[RL_2].positionStiffness = 0;
+         SendLowROS.motorCmd[RL_2].velocityStiffness = 0;
+         SendLowROS.motorCmd[RL_2].torque =joint_effort_command_[11];
 
-//        if(joint_effort_command_[11]>5.0){
-//            joint_effort_command_[11]=5.0;
-//        }
-//        if(joint_effort_command_[11]<-5.0){
-//            joint_effort_command_[11]=-5.0;
-//        }
 
-//         SendLowROS.motorCmd[RL_2].position = PosStopF;
-//         SendLowROS.motorCmd[RL_2].velocity = VelStopF;
-//         SendLowROS.motorCmd[RL_2].positionStiffness = 0;
-//         SendLowROS.motorCmd[RL_2].velocityStiffness = 0;
-//         SendLowROS.motorCmd[RL_2].torque =joint_effort_command_[11];
-
-//        if(joint_effort_command_[8]>5.0){
-//            joint_effort_command_[8]=5.0;
-//        }
-//        if(joint_effort_command_[8]<-5.0){
-//            joint_effort_command_[8]=-5.0;
-//        }
-
-//         SendLowROS.motorCmd[RR_2].position = PosStopF;
-//         SendLowROS.motorCmd[RR_2].velocity = VelStopF;
-//         SendLowROS.motorCmd[RR_2].positionStiffness = 0;
-//         SendLowROS.motorCmd[RR_2].velocityStiffness = 0;
-//         SendLowROS.motorCmd[RR_2].torque =joint_effort_command_[8];
-
-//         SendLowROS.motorCmd[RR_0].position = PosStopF;
-//         SendLowROS.motorCmd[RR_0].velocity = VelStopF;
-//         SendLowROS.motorCmd[RR_0].positionStiffness = 0;
-//         SendLowROS.motorCmd[RR_0].velocityStiffness = 0;
-//         SendLowROS.motorCmd[RR_0].torque =torque_set[6]-0.65f;
-
-//         SendLowROS.motorCmd[RR_1].position = PosStopF;
-//         SendLowROS.motorCmd[RR_1].velocity = VelStopF;
-//         SendLowROS.motorCmd[RR_1].positionStiffness = 0;
-//         SendLowROS.motorCmd[RR_1].velocityStiffness = 0;
-//         SendLowROS.motorCmd[RR_1].torque =torque_set[7];
-
-//         SendLowROS.motorCmd[RR_2].position = PosStopF;
-//         SendLowROS.motorCmd[RR_2].velocity = VelStopF;
-//         SendLowROS.motorCmd[RR_2].positionStiffness = 0;
-//         SendLowROS.motorCmd[RR_2].velocityStiffness = 0;
-//         SendLowROS.motorCmd[RR_2].torque =torque_set[8];
-
-//         SendLowROS.motorCmd[RL_0].position = PosStopF;
-//         SendLowROS.motorCmd[RL_0].velocity = VelStopF;
-//         SendLowROS.motorCmd[RL_0].positionStiffness = 0;
-//         SendLowROS.motorCmd[RL_0].velocityStiffness = 0;
-//         SendLowROS.motorCmd[RL_0].torque =torque_set[9]+0.65f;
-
-//         SendLowROS.motorCmd[RL_1].position = PosStopF;
-//         SendLowROS.motorCmd[RL_1].velocity = VelStopF;
-//         SendLowROS.motorCmd[RL_1].positionStiffness = 0;
-//         SendLowROS.motorCmd[RL_1].velocityStiffness = 0;
-//         SendLowROS.motorCmd[RL_1].torque =torque_set[10];
-
-//         SendLowROS.motorCmd[RL_2].position = PosStopF;
-//         SendLowROS.motorCmd[RL_2].velocity = VelStopF;
-//         SendLowROS.motorCmd[RL_2].positionStiffness = 0;
-//         SendLowROS.motorCmd[RL_2].velocityStiffness = 0;
-//         SendLowROS.motorCmd[RL_2].torque =torque_set[11];
 }
     // gravity compensation
 //    SendLowROS.motorCmd[FR_0].torque = -0.65f;
@@ -988,7 +1424,13 @@ void RobotStateLcmHardwareInterface::write(const ros::Time &time, const ros::Dur
 //    SendLowROS.motorCmd[RR_0].torque = -0.65f;
 //    SendLowROS.motorCmd[RL_0].torque = +0.65f;
 
+//    if(controller_name=="FL_hip_controller"){
+//        std::cout<<"name is FL_hip_controller!!!"<<std::endl;
+//    }
 
+//    if(controller_name=="laikago_gazebo/FL_hip_controller"){
+//        std::cout<<"name is laikago_gazebo/FL_hip_controller!!!"<<std::endl;
+//    }
 
     multi_servoCmd.clear();
     memcpy(&SendLowLCM, &SendLowROS, sizeof(LowCmd));

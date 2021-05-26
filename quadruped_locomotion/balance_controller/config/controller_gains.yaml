@@ -5,26 +5,26 @@ balance_controller:
       kd: 10
       kff: 1
     lateral:
-      kp: 1500
+      kp: 600
       kd: 10
       kff: 1
     vertical:
-      kp: 1000
+      kp: 600
       kd: 10
       kff: 1
     roll:
-      kp: 200
-      kd: 20
+      kp: 500
+      kd: 10
       kff: 0.2
     pitch:
-      kp: 400
-      kd: 80
+      kp: 500
+      kd: 8
       kff: 0.2
     yaw:
-      kp: 200
-      kd: 50
+      kp: 500
+      kd: 5
       kff: 1
-    gravity_compensation_percentage: 1.15
+    gravity_compensation_percentage: 1.005
   contact_force_distribution:
     weights:
       force:
@@ -46,11 +46,38 @@ balance_controller:
       load_factor: 1
 single_leg_controller:
   x_direction:
-    kp: 800
-    kd: 20
+    kp: 150
+    kd: 5
   y_direction:
-    kp: 800
-    kd: 20
+    kp: 150
+    kd: 5
   z_direction:
-    kp: 800
-    kd: 80
+    kp: 150
+    kd: 5
+
+mpc:
+  weights: [5, 5, 0.2, 0, 0, 10, 0.1, 0.1, 1., 1., 1., 1., 0]
+  #weights: [0.25, 0.25, 0.2, 2, 2, 50, 0, 0, 0.3, 0.2, 0.2, 0.1,0]
+  #weights: [0.25, 2, 10, 50, 50, 100, 0, 0, 0.3, 0.2, 0.2, 0.1, 0.0]
+  #roll-pitch-yaw x-y-z ang-vel vel gravity-place-holder
+  #weights: [20, 20, 50.0, 10, 10, 100, 10.0, 10.0, 1.0, 1.0, 1.0, 1.0, 0]
+  roll: 0.25
+  pitch: 0.25
+  yaw: 10
+  x: 2
+  y: 2
+  z: 20
+  roll_vel: 0.1
+  pitch_vel: 0.1
+  yaw_vel: 0.3
+  x_vel: 0.2
+  y_vel: 0.2
+  z_vel: 0.2
+  gravity_holder: 0.0
+  steps_MPC: 8
+  #mi:10
+  delta_t_MPC: 0.05
+  #mi:0.026
+  torque_weight: 0.00001
+  #mi:4e-5
+  body_mass: 20.73

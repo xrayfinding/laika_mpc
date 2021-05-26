@@ -21,6 +21,7 @@ Eigen::Matrix3d ConvertRpyToRot(const Eigen::Vector3d& rpy);
 //   [ 0, -c,  b]
 //   [ c,  0, -a]
 //   [-b,  a,  0]
+Eigen::Matrix3d ConverRpyToRot_simple(const Eigen::Vector3d& rpy);
 Eigen::Matrix3d ConvertToSkewSymmetric(const Eigen::Vector3d& vec);
 
 // The CoM dynamics can be written as:
@@ -189,6 +190,14 @@ Matrix3d ConvertRpyToRot(const Vector3d& rpy) {
     return q.matrix();
 }
 
+Matrix3d ConverRpyToRot_simple(const Vector3d& rpy){
+    assert(rpy.size()==k3Dim);
+    const AngleAxisd roll(0, Vector3d::UnitX());
+    const AngleAxisd pitch(0, Vector3d::UnitY());
+    const AngleAxisd yaw(rpy[2],Vector3d::UnitZ());
+    Quaterniond q = yaw*pitch*yaw;
+    return q.matrix();
+}
 Matrix3d ConvertToSkewSymmetric(const Vector3d& vec) {
     Matrix3d skew_symm;
     skew_symm << 0, -vec(2), vec(1), vec(2), 0, -vec(0), -vec(1), vec(0), 0;
@@ -559,7 +568,8 @@ std::vector<double> ConvexMpc::ComputeContactForces(
         com_roll_pitch_yaw[2]);
 
     CalculateAMat(rpy, &a_mat_);
-
+    //Golaoxu : using real R not the simplified Rz to compute inertia from base to world
+    // ??? use the paper way, and get a bad influence
     rotation_ = ConvertRpyToRot(rpy);
     const Matrix3d inv_inertia_world =
         rotation_ * inv_inertia_ * rotation_.transpose();
