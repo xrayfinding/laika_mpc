@@ -155,6 +155,7 @@ class VirtualModelController : public MotionControllerBase
   virtual bool setToInterpolated(const MotionControllerBase& motionController1, const MotionControllerBase& motionController2, double t);
   bool QuaternionToEuler_desired();
   bool QuaternionToEuler();
+  bool getRealcontact_noncontact(const std::vector<int>& _contacts);
 
  private:
   std::shared_ptr<ContactForceDistributionBase> contactForceDistribution_;
@@ -176,6 +177,8 @@ class VirtualModelController : public MotionControllerBase
   std::vector<double> desired_quaternion;
   std::vector<double> quaternion;
 
+  //this real contacts is used when there is non leg is choosed by the state_machien
+  std::vector<int> contacts_zero;
   //! Base position error in base frame.
   Position positionErrorInControlFrame_;
   //! Base orientation error vector (rotation vector) in base frame.

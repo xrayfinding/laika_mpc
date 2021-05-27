@@ -631,6 +631,34 @@ namespace balance_controller{
 ****************/
 
     //! WSHY: compute joint torque
+    if(robot_state->getNumberOfSupportLegs()==0){
+        std::vector<int> contact_tmp(4,0);
+        for(auto leg:limbs_){
+            std::cout << limbs_state.at(leg)->getState() << "-";
+            if(limbs_state.at(leg)->getState()==8){
+                int _n;
+                switch (leg) {
+                    case free_gait::LimbEnum::LF_LEG:
+                        _n = 0;
+                        break;
+                    case free_gait::LimbEnum::RF_LEG:
+                        _n = 1;
+                        break;
+                    case free_gait::LimbEnum::RH_LEG:
+                        _n = 2;
+                        break;
+                    case free_gait::LimbEnum::LH_LEG:
+                        _n = 3;
+                        break;
+                    default:
+                        ROS_ERROR("no leg be chosen");
+                }
+                contact_tmp[_n] = 1;
+            }
+        }
+        virtual_model_controller_->getRealcontact_noncontact(contact_tmp);
+        std::cout << std::endl;
+    }
     bool keep_flag = false;
     if(!virtual_model_controller_->compute())
       {

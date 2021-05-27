@@ -23,7 +23,7 @@ base_balance_controller:
   real_robot: false
   ignore_contact_sensor: false
   contact_pressure_bias: 80
-  log_data: true
+  log_data: false
   joints: ['LF_HAA', 'LF_HFE', 'LF_KFE', 'RF_HAA', 'RF_HFE', 'RF_KFE', 'RH_HAA', 'RH_HFE', 'RH_KFE', 'LH_HAA', 'LH_HFE', 'LH_KFE']
   LF_HAA/pid: {p: 1000.0, i: 0.01, d: 10.0}
   LF_HFE/pid: {p: 1000.0, i: 0.01, d: 10.0}

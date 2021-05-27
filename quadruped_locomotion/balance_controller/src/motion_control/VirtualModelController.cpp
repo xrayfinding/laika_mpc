@@ -572,6 +572,16 @@ bool VirtualModelController::collections_4_mpc(bool ways_mit){
             foot_contact_states[_n] = 0;
         }
     }
+    if(robot_state_->getNumberOfSupportLegs()==0){
+        ROS_WARN("NO CONTACT!!!!!");
+        for(int i = 0; i < 4; i++){
+            std::cout<< contacts_zero[i] << std::endl;
+        }
+    }
+//    for(auto item : foot_contact_states){
+//        std::cout<< item << "  ";
+//    }
+//    std::cout << std::endl;
     //6.foot_postion
     foot_positions_body_frame.resize(12);
     for(const auto& leg: limbs_){
@@ -667,6 +677,12 @@ bool VirtualModelController::isParametersLoaded() const
   return false;
 }
 
+bool VirtualModelController::getRealcontact_noncontact(const std::vector<int>& _contacts){
+    contacts_zero.resize(4);
+    for(int i = 0; i < _contacts.size();i++){
+        contacts_zero[i] = _contacts[i];
+    }
+}
 
 std::ostream& operator << (std::ostream& out, const VirtualModelController& motionController)
 {

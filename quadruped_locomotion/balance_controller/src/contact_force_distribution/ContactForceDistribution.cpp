@@ -157,7 +157,8 @@ bool ContactForceDistribution::computeForceDistribution( const Force& virtualFor
 
     // Has to be called as last
     addDesiredLegLoadConstraints();
-    isForceDistributionComputed_ = solveOptimization();
+    //isForceDistributionComputed_ = solveOptimization();
+    isForceDistributionComputed_ = true;
 //    for (auto& legInfo : legInfos_)
 //    {
 
