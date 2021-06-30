@@ -60,8 +60,14 @@
 #include "dynamic_reconfigure/server.h"
 #include "balance_controller/balance_controllerConfig.h"
 
-namespace balance_controller {
+#include "pronto_laikago_commons/feet_contact_forces.hpp"
+#include "pronto_laikago_commons/feet_jacobians.hpp"
+#include "pronto_laikago_commons/forward_kinematics.hpp"
+#include "geometry_msgs/PoseWithCovariance.h"
 
+#include <ctime>
+namespace balance_controller {
+using laikago::FeetContactForces;
 class VirtualModelController : public MotionControllerBase
 {
  public:
@@ -220,7 +226,24 @@ class VirtualModelController : public MotionControllerBase
   boost::shared_ptr<DynamicConfigServer> dynamicReconfigureServer_;
   dynamic_reconfigure::Server<balance_controller::balance_controllerConfig>::CallbackType reconfigureCallbackType_;
   boost::recursive_mutex param_reconfig_mutex_;
- private:
+
+  laikago::FeetContactForces feet_forces;
+  laikago::FeetJacobians feet_jacs;
+  laikago::ForwardKinematics fwd_kin;
+  laikago::FeetContactForces::JointState q;
+  laikago::FeetContactForces::JointState qd;
+  laikago::FeetContactForces::JointState tau;
+  laikago::FeetContactForces::JointState qdd;
+  Eigen::Quaterniond orient;
+  laikago::FeetContactForces::LegID leg;
+  laikago::FeetContactForces::Vector3d xd;
+  laikago::FeetContactForces::Vector3d xdd;
+  laikago::FeetContactForces::Vector3d omega;
+  laikago::FeetContactForces::Vector3d omegad;
+  laikago::FeetContactForces::LegVectorMap feet_force_comute;
+
+  clock_t start_time, end_time;
+private:
   /*!
    * Compute error between desired an actual robot pose and twist.
    * @return true if successful.
@@ -250,6 +273,8 @@ class VirtualModelController : public MotionControllerBase
   bool isParametersLoaded() const;
   bool collections_4_mpc();
   bool collections_4_mpc(bool ways_mit);
+  bool getTorqueFromIDyn(const std::vector<double>& foot_force);
+
   void dynamicReconfigureCallback(balance_controller::balance_controllerConfig& config, uint32_t level);
 };
 

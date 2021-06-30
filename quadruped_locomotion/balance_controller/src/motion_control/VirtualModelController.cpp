@@ -141,13 +141,34 @@ bool VirtualModelController::compute()
    *
    */
   collections_4_mpc(true);
+  //start_time = clock();
   vector<double> mpc_ans =  convexMpc_->ComputeContactForces(com_position, com_velocity, com_roll_pitch_yaw, com_angular_velocity,
                                    foot_contact_states,foot_positions_body_frame ,foot_friction_coeffs,
                                    desired_com_position, desired_com_velocity, desired_com_roll_pitch_yaw,desired_com_angular_velocity);
+  //end_time = clock();
+  //double delat_t = (double)(end_time-start_time)/CLOCKS_PER_SEC;
+  //delat_t*=1000;
+  //std::cout << "total time " << delat_t << std::endl;
   vector<double> mpc_use(mpc_ans.begin(), mpc_ans.begin()+12);
-    if (!contactForceDistribution_->computeForceDistribution(virtualForceInBaseFrame_, virtualTorqueInBaseFrame_, mpc_use)) {
+  getTorqueFromIDyn(mpc_use);
+  vector<double> leg_torque_id;
+  leg_torque_id.resize(12);
+  for (int i = 0; i < 6; i++) {
+      leg_torque_id[i] = tau(i);
+  }
+  for(int i = 6; i < 9; i++){
+      leg_torque_id[i] = tau(i+3);
+  }
+  for(int i = 9; i < 12; i++){
+      leg_torque_id[i] = tau(i-3);
+  }
+//Golaoxu : this is the function that consider the whole body control which use the whole body dynamic model.
+//  if (!contactForceDistribution_->computeForceDistribution(virtualForceInBaseFrame_, virtualTorqueInBaseFrame_, mpc_use, leg_torque_id)) {
+//    return false;
+//  }
+  if (!contactForceDistribution_->computeForceDistribution(virtualForceInBaseFrame_, virtualTorqueInBaseFrame_, mpc_use)) {
       return false;
-    }
+  }
   return true;
 }
 
@@ -514,8 +535,8 @@ bool VirtualModelController::collections_4_mpc(bool ways_mit){
     com_position[1] = _com_position.y();
     com_position[2] = _com_position.z();
 
-    com_position[0] = 0.0;
-    com_position[1] = 0.0;
+    //com_position[0] = 0.0;
+    //com_position[1] = 0.0;
 
     //2.com_velocity
     LinearVelocity _com_velocity = robot_state_->getLinearVelocityBaseInWorldFrame();
@@ -523,6 +544,9 @@ bool VirtualModelController::collections_4_mpc(bool ways_mit){
     com_velocity[0] = _com_velocity.x()/0.36;
     com_velocity[1] = _com_velocity.y()/0.36;
     com_velocity[2] = _com_velocity.z()/0.36;
+//    com_velocity[0] = _com_velocity.x();
+//    com_velocity[1] = _com_velocity.y();
+//    com_velocity[2] = _com_velocity.z();
     //3.rpy
     com_roll_pitch_yaw.resize(3);
     RotationQuaternion _rotation_orien= robot_state_->getOrientationBaseToWorld();
@@ -534,13 +558,18 @@ bool VirtualModelController::collections_4_mpc(bool ways_mit){
     QuaternionToEuler();
 
     //don't consider the yaw angel
-    com_roll_pitch_yaw[2] = 0;
+    //com_roll_pitch_yaw[2] = 0;
     //4.ang_vel
 
 
    // LocalAngularVelocity _com_angular_velocity =  robot_state_->getAngularVelocityBaseInBaseFrame();
 
     LocalAngularVelocity _com_angular_velocity =  orientationControlToBase.rotate(robot_state_->getAngularVelocityBaseInBaseFrame());
+    //golaoxu: it seems that some problems
+    RotationQuaternion base_in_world = robot_state_->getOrientationBaseToWorld();
+    LocalAngularVelocity com_ang_vel_world = base_in_world.rotate(robot_state_->getAngularVelocityBaseInBaseFrame());
+    _com_angular_velocity = com_ang_vel_world;
+    //end
     com_angular_velocity.resize(3);
     com_angular_velocity[0] = _com_angular_velocity.x();
     com_angular_velocity[1] = _com_angular_velocity.y();
@@ -572,12 +601,12 @@ bool VirtualModelController::collections_4_mpc(bool ways_mit){
             foot_contact_states[_n] = 0;
         }
     }
-    if(robot_state_->getNumberOfSupportLegs()==0){
-        ROS_WARN("NO CONTACT!!!!!");
-        for(int i = 0; i < 4; i++){
-            std::cout<< contacts_zero[i] << std::endl;
-        }
-    }
+//    if(robot_state_->getNumberOfSupportLegs()==0){
+//        ROS_WARN("NO CONTACT!!!!!");
+//        for(int i = 0; i < 4; i++){
+//            std::cout<< contacts_zero[i] << std::endl;
+//        }
+//    }
 //    for(auto item : foot_contact_states){
 //        std::cout<< item << "  ";
 //    }
@@ -619,8 +648,8 @@ bool VirtualModelController::collections_4_mpc(bool ways_mit){
     desired_com_position[1] = _desired_com_position.y();
     desired_com_position[2] = _desired_com_position.z();
 
-    desired_com_position[0] = 0.0;
-    desired_com_position[1] = 0.0;
+    //desired_com_position[0] = 0.0;
+    //desired_com_position[1] = 0.0;
     //0319
     //9.desire_vel
     LinearVelocity _desired_com_velocity = robot_state_->getTargetLinearVelocityBaseInWorldFrame();
@@ -631,8 +660,8 @@ bool VirtualModelController::collections_4_mpc(bool ways_mit){
     desired_com_velocity[2] = 0.0;
 
     //0319
-    desired_com_velocity[0] = 0;
-    desired_com_velocity[1] = 0;
+    //desired_com_velocity[0] = 0;
+    //desired_com_velocity[1] = 0;
     desired_com_velocity[2] = 0;
 
     //10.desire_rpy
@@ -648,13 +677,15 @@ bool VirtualModelController::collections_4_mpc(bool ways_mit){
 //                 desired_com_roll_pitch_yaw[2] << " "<< std::endl;
     desired_com_roll_pitch_yaw[0] = 0.0;
     desired_com_roll_pitch_yaw[1] = 0.0;
-    desired_com_roll_pitch_yaw[2] = 0.0;
+    //desired_com_roll_pitch_yaw[2] = 0.0;
 
 //    std::cout << " rpy " <<
 //                 com_roll_pitch_yaw[2] << " "<< std::endl;
 
     //11.desire_ang_vel
     LocalAngularVelocity _desired_com_angular_velocity = robot_state_->getTargetAngularVelocityBaseInBaseFrame();
+    LocalAngularVelocity _desired_ang_vel = base_in_world.rotate(robot_state_->getTargetAngularVelocityBaseInBaseFrame());
+    _desired_com_angular_velocity = _desired_ang_vel;
     desired_com_angular_velocity.resize(3);
     desired_com_angular_velocity[0] = _desired_com_angular_velocity.x();
     desired_com_angular_velocity[1] = _desired_com_angular_velocity.y();
@@ -663,12 +694,76 @@ bool VirtualModelController::collections_4_mpc(bool ways_mit){
     desired_com_angular_velocity[1] = 0.0;
     //0319
     //Golaoxu : this has great influence of mpc controller
-    desired_com_angular_velocity[2] = 0.0;
+    //desired_com_angular_velocity[2] = 0.0;
 
     return  true;
 }
 
-
+bool VirtualModelController::getTorqueFromIDyn(const std::vector<double>& foot_force){
+    orient.w() = quaternion[0];
+    orient.x() = quaternion[1];
+    orient.y() = quaternion[2];
+    orient.z() = quaternion[3];
+    q.setZero();
+    qd.setZero();
+    qdd.setZero();
+    free_gait::JointPositionsLeg joint_ang = robot_state_->getJointPositionsForLimb(free_gait::LimbEnum::LF_LEG);
+    free_gait::JointVelocitiesLeg joint_vel = robot_state_->getJointVelocitiesForLimb(free_gait::LimbEnum::LF_LEG);
+    q(0) = joint_ang(0);
+    q(1) = joint_ang(1);
+    q(2) = joint_ang(2);
+    qd(0) = joint_vel(0);
+    qd(1) = joint_vel(1);
+    qd(2) = joint_vel(2);
+    joint_ang = robot_state_->getJointPositionsForLimb(free_gait::LimbEnum::RF_LEG);
+    joint_vel = robot_state_->getJointVelocitiesForLimb(free_gait::LimbEnum::RF_LEG);
+    q(3) = joint_ang(0);
+    q(4) = joint_ang(1);
+    q(5) = joint_ang(2);
+    qd(3) = joint_vel(0);
+    qd(4) = joint_vel(1);
+    qd(5) = joint_vel(2);
+    joint_ang = robot_state_->getJointPositionsForLimb(free_gait::LimbEnum::LH_LEG);
+    joint_vel = robot_state_->getJointVelocitiesForLimb(free_gait::LimbEnum::LH_LEG);
+    q(6) = joint_ang(0);
+    q(7) = joint_ang(1);
+    q(8) = joint_ang(2);
+    qd(6) = joint_vel(0);
+    qd(7) = joint_vel(1);
+    qd(8) = joint_vel(2);
+    joint_ang = robot_state_->getJointPositionsForLimb(free_gait::LimbEnum::RH_LEG);
+    joint_vel = robot_state_->getJointVelocitiesForLimb(free_gait::LimbEnum::RH_LEG);
+    q(9) = joint_ang(0);
+    q(10) = joint_ang(1);
+    q(11) = joint_ang(2);
+    qd(9) = joint_vel(0);
+    qd(10) = joint_vel(1);
+    qd(11) = joint_vel(2);
+    xd(0) = com_velocity[0];
+    xd(1) = com_velocity[1];
+    xd(2) = com_velocity[2];
+    omega(0) = com_angular_velocity[0];
+    omega(1) = com_angular_velocity[1];
+    omega(2) = com_angular_velocity[2];
+    omegad.setZero();
+    xdd.setZero();
+    feet_force_comute[laikago::FeetContactForces::LegID::LF](0) = -foot_force[0];
+    feet_force_comute[laikago::FeetContactForces::LegID::LF](1) = -foot_force[1];
+    feet_force_comute[laikago::FeetContactForces::LegID::LF](2) = -foot_force[2];
+    feet_force_comute[laikago::FeetContactForces::LegID::LH](0) = -foot_force[3];
+    feet_force_comute[laikago::FeetContactForces::LegID::LH](1) = -foot_force[4];
+    feet_force_comute[laikago::FeetContactForces::LegID::LH](2) = -foot_force[5];
+    feet_force_comute[laikago::FeetContactForces::LegID::RH](0) = -foot_force[6];
+    feet_force_comute[laikago::FeetContactForces::LegID::RH](1) = -foot_force[7];
+    feet_force_comute[laikago::FeetContactForces::LegID::RH](2) = -foot_force[8];
+    feet_force_comute[laikago::FeetContactForces::LegID::RF](0) = -foot_force[9];
+    feet_force_comute[laikago::FeetContactForces::LegID::RF](1) = -foot_force[10];
+    feet_force_comute[laikago::FeetContactForces::LegID::RF](2) = -foot_force[11];
+    tau.setZero();
+    if(feet_forces.getTorqueFromIDyn(q,qd,tau,orient,feet_force_comute,qdd,xd,xdd,omega,omegad)){
+        //std::cout << tau(0) <<"***"<< tau(1)<<"***" << tau(2) << std::endl;
+    }
+}
 bool VirtualModelController::isParametersLoaded() const
 {
   if (isParametersLoaded_) return true;

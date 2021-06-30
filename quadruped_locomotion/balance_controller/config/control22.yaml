@@ -61,18 +61,18 @@ base_mpc_controller:
 all_joints_position_effort_group_controller:
   type: effort_controllers/JointGroupPositionController
   joints: ['LF_HAA', 'LF_HFE', 'LF_KFE', 'RF_HAA', 'RF_HFE', 'RF_KFE', 'RH_HAA', 'RH_HFE', 'RH_KFE', 'LH_HAA', 'LH_HFE', 'LH_KFE']
-  LF_HAA/pid: {p: 300.0, i: 0.01, d: 10.0}
-  LF_HFE/pid: {p: 300.0, i: 0.01, d: 10.0}
-  LF_KFE/pid: {p: 300.0, i: 0.01, d: 10.0}
-  RF_HAA/pid: {p: 300.0, i: 0.01, d: 10.0}
-  RF_HFE/pid: {p: 300.0, i: 0.01, d: 10.0}
-  RF_KFE/pid: {p: 300.0, i: 0.01, d: 10.0}
-  LH_HAA/pid: {p: 300.0, i: 0.01, d: 10.0}
-  LH_HFE/pid: {p: 300.0, i: 0.01, d: 10.0}
-  LH_KFE/pid: {p: 300.0, i: 0.01, d: 10.0}
-  RH_HAA/pid: {p: 300.0, i: 0.01, d: 10.0}
-  RH_HFE/pid: {p: 300.0, i: 0.01, d: 10.0}
-  RH_KFE/pid: {p: 300.0, i: 0.01, d: 10.0}
+  LF_HAA/pid: {p: 10.0, i: 0.01, d: 10.0}
+  LF_HFE/pid: {p: 10.0, i: 0.01, d: 10.0}
+  LF_KFE/pid: {p: 10.0, i: 0.01, d: 10.0}
+  RF_HAA/pid: {p: 10.0, i: 0.01, d: 10.0}
+  RF_HFE/pid: {p: 10.0, i: 0.01, d: 10.0}
+  RF_KFE/pid: {p: 10.0, i: 0.01, d: 10.0}
+  LH_HAA/pid: {p: 10.0, i: 0.01, d: 10.0}
+  LH_HFE/pid: {p: 10.0, i: 0.01, d: 10.0}
+  LH_KFE/pid: {p: 10.0, i: 0.01, d: 10.0}
+  RH_HAA/pid: {p: 10.0, i: 0.01, d: 10.0}
+  RH_HFE/pid: {p: 10.0, i: 0.01, d: 10.0}
+  RH_KFE/pid: {p: 10.0, i: 0.01, d: 10.0}
 
 
 all_joints_position_group_controller:

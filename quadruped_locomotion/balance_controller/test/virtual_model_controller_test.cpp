@@ -18,7 +18,7 @@
 #include "balance_controller/contact_force_distribution/ContactForceDistribution.hpp"
 #include "balance_controller/motion_control/MotionControllerBase.hpp"
 #include "balance_controller/motion_control/VirtualModelController.hpp"
-
+#include "pronto_laikago_commons/feet_contact_forces.hpp"
 TEST(virtual_model_controller, QPOptimization)
 {
   ros::NodeHandle nh("~");

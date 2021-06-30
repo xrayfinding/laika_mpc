@@ -38,7 +38,7 @@
 #include "osqp/ctrlc.h"
 #include "osqp/osqp.h"
 #include "unsupported/Eigen/MatrixFunctions"
-
+#include "pronto_laikago_commons/feet_contact_forces.hpp"
 
 namespace MPC{
 using Eigen::AngleAxisd;
@@ -135,7 +135,7 @@ private:
     Eigen::Matrix3d inertia_world_;    // rotation x inertia x rotation_transpose
     Eigen::MatrixXd a_mat_;            // 13 x 13
     Eigen::MatrixXd b_mat_;            // 13 x (num_legs * 3)
-    Eigen::MatrixXd ab_concatenated_;  // 13 + num_legs * 3 x 13 + num_legs * 3
+    Eigen::MatrixXd ab_concatenated_;  // 13 + num_legs * 3 x 13 + num_legs * 3 :A+B
     Eigen::MatrixXd a_exp_;            // same dimension as a_mat_
     Eigen::MatrixXd b_exp_;            // same dimension as b_mat_
 

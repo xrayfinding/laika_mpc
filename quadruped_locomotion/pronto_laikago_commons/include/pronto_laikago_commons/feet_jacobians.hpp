@@ -2,7 +2,6 @@
 
 #include <pronto_quadruped_commons/feet_jacobians.h>
 #include <laikago_robcogen/jacobians.h>
-
 namespace laikago {
 
 class FeetJacobians : public pronto::quadruped::FeetJacobians {

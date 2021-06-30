@@ -74,10 +74,11 @@ mpc:
   y_vel: 0.2
   z_vel: 0.2
   gravity_holder: 0.0
-  steps_MPC: 8
+  steps_MPC: 6
   #mi:10
   delta_t_MPC: 0.05
   #mi:0.026
-  torque_weight: 0.00001
+  torque_weight: 0.000005
   #mi:4e-5
-  body_mass: 20.73
+  #body_mass: 25.73
+  body_mass: 22.73

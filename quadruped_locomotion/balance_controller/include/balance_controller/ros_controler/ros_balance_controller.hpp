@@ -45,9 +45,19 @@
 
 #include "Eigen/Dense"
 #include "Eigen/LU"
+#include "dynamic_reconfigure/server.h"
+#include "balance_controller/balance_controllerConfig.h"
 
+#include "laikago/rcg/transforms.h"
+#include "laikago/rcg/declarations.h"
+#include "laikago/rcg/inertia_properties.h"
+#include "laikago/rcg/inverse_dynamics.h"
+#include "pronto_laikago_commons/feet_contact_forces.hpp"
+#include "pronto_laikago_commons/feet_jacobians.hpp"
+#include "pronto_laikago_commons/forward_kinematics.hpp"
+#include "queue"
 namespace balance_controller {
-
+  using laikago::FeetContactForces;
   class RosBalanceController : public controller_interface::Controller<hardware_interface::RobotStateInterface>
   {
   typedef std::unordered_map<free_gait::LimbEnum, std::unique_ptr<StateSwitcher>, EnumClassHash> LimbState;
@@ -211,6 +221,14 @@ namespace balance_controller {
 
     double initial_pressure[4];
     double contact_pressure_bias;
+
+    typedef dynamic_reconfigure::Server<balance_controller::balance_controllerConfig> DynamicConfigServer;
+
+    boost::shared_ptr<DynamicConfigServer> dynamicReconfigureServer_;
+    dynamic_reconfigure::Server<balance_controller::balance_controllerConfig>::CallbackType reconfigureCallbackType_;
+    boost::recursive_mutex param_reconfig_mutex_;
+    void dynamicReconfigureCallback(balance_controller::balance_controllerConfig& config, uint32_t level);
+
     /*
      *GoLaoxu:
      * 1. func and
@@ -248,6 +266,10 @@ namespace balance_controller {
     std::vector<double> quaternion;
     std::queue<vector<double>> control_steps_mpc;
 
+    /*
+     * Golaoxu : for whole body control test
+     */
+    //FeetContactForces torque_IDyn;
   };
 
 }

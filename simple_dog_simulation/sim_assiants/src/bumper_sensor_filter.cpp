@@ -222,9 +222,10 @@ int main(int argc, char *argv[])
   ros::init(argc, argv, "bumper_sensor_filter_node");
   ros::NodeHandle node_handle("~");
   BumperSensorFilter bumperSensorFilter(node_handle);
-
+  ros::Rate rate(400);
   while (ros::ok()) {
-      ros::spin();
+      ros::spinOnce();
+      rate.sleep();
     }
   return 0;
 }

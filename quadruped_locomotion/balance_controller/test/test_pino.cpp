@@ -17,6 +17,8 @@
 #include "sensor_msgs/Imu.h"
 #include "boost/thread.hpp"
 #include "boost/bind.hpp"
+#include "sensor_msgs/JointState.h"
+
 // PINOCCHIO_MODEL_DIR is defined by the CMake but you can define your own directory here.
 #ifndef PINOCCHIO_MODEL_DIR
   #define PINOCCHIO_MODEL_DIR "/home/glx/depends/pinocchio/models"
@@ -36,7 +38,7 @@ laikago::FeetContactForces::Vector3d xdd;
 laikago::FeetContactForces::Vector3d omega;
 laikago::FeetContactForces::Vector3d omegad;
 laikago::FeetContactForces::LegVectorMap feet_force_comute;
-
+boost::recursive_mutex r_mutex;
 void basePoseCallback(const free_gait_msgs::RobotStateConstPtr& robot_state){
     geometry_msgs::PoseWithCovariance base_pose_in_world_;
     base_pose_in_world_.pose = robot_state->base_pose.pose.pose;
@@ -115,12 +117,18 @@ void basePoseCallback(const free_gait_msgs::RobotStateConstPtr& robot_state){
                   << feet_force_comute[laikago::FeetContactForces::LegID::RH](2)<<" "
                   << std::endl;
     }
+    xdd.setZero();
+    if(feet_forces.getTorqueFromIDyn(q,qd,tau,orient,feet_force_comute,qdd,xd,xdd,omega,omegad)){
+        std::cout << tau(0) <<"***"<< tau(1)<<"***" << tau(2) << std::endl;
+    }
 }
 
 void imuCallback(const sensor_msgs::Imu::ConstPtr& imu_msg){
     xdd(0) = imu_msg->linear_acceleration.x;
     xdd(1) = imu_msg->linear_acceleration.y;
-    xdd(2) = imu_msg->linear_acceleration.z;
+    xdd(2) = imu_msg->linear_acceleration.z - 9.8;
+    //std::cout << xdd(2) << std::endl;
+
 }
 int main(int argc, char ** argv)
 {
@@ -208,13 +216,23 @@ int main(int argc, char ** argv)
     ros::NodeHandle nh;
     ros::Subscriber base_sub = nh.subscribe("/gazebo/robot_states", 1 , basePoseCallback);
     ros::Subscriber imu_sub = nh.subscribe("/imu",1,imuCallback);
+    ros::Publisher torqueIDyn = nh.advertise<sensor_msgs::JointState>("/joint_torque_ID",1);
     ros::Rate rate(400);
     omegad.setZero();
     xdd.setZero();
     while(ros::ok()){
         ros::spinOnce();
+        sensor_msgs::JointState joint_torque;
         //std::cout << q << qd << tau << orient << qdd << xd << xdd << omega << omegad << std::endl;
-
+        boost::recursive_mutex::scoped_lock lock(lock1);
+        for(int i = 0; i < 12; i++){
+            joint_torque.name.push_back("joint"+std::to_string(i));
+            joint_torque.position.push_back(0);
+            joint_torque.velocity.push_back(0);
+            joint_torque.effort.push_back(tau(i));
+        }
+        torqueIDyn.publish(joint_torque);
+        lock1.unlock();
         rate.sleep();
     }
 }

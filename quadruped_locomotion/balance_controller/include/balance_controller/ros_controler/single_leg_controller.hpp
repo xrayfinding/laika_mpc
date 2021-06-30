@@ -32,7 +32,6 @@
 
 #include "algorithm"
 
-
 namespace balance_controller {
 
   class SingleLegController : public controller_interface::Controller<hardware_interface::RobotStateInterface>

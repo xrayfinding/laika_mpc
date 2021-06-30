@@ -86,6 +86,33 @@ public:
 
     }
 
+    bool getTorqueFromIDyn(const JointState& q,
+                           const JointState& qd,
+                           JointState& tau,
+                           const Quaterniond& orient,
+                           const LegID& leg,
+                           const Vector3d& foot_grf,
+                           const JointState& qdd = JointState::Zero(),
+                           const Vector3d& xd = Vector3d::Zero(),
+                           const Vector3d& xdd = Vector3d::Zero(),
+                           const Vector3d& omega = Vector3d::Zero(),
+                           const Vector3d& omegad = Vector3d::Zero());
+    inline bool getTorqueFromIDyn(const JointState& q,
+                                  const JointState& qd,
+                                  JointState& tau,
+                                  const Quaterniond& orient,
+                                  const LegVectorMap& feet_grf,
+                                  const JointState& qdd = JointState::Zero(),
+                                  const Vector3d& xd = Vector3d::Zero(),
+                                  const Vector3d& xdd = Vector3d::Zero(),
+                                  const Vector3d& omega = Vector3d::Zero(),
+                                  const Vector3d& omegad = Vector3d::Zero()){
+        bool lf = getTorqueFromIDyn(q,qd,tau,orient,LegID::LF,feet_grf[LegID::LF],qdd,xd,xdd,omega,omegad);
+        bool rf = getTorqueFromIDyn(q,qd,tau,orient,LegID::RF,feet_grf[LegID::RF],qdd,xd,xdd,omega,omegad);
+        bool lh = getTorqueFromIDyn(q,qd,tau,orient,LegID::LH,feet_grf[LegID::LH],qdd,xd,xdd,omega,omegad);
+        bool rh = getTorqueFromIDyn(q,qd,tau,orient,LegID::RH,feet_grf[LegID::RH],qdd,xd,xdd,omega,omegad);
+        return  lf&rf&lh&rh;
+    }
 private:
     laikago::rcg::InertiaProperties inertia_prop_;
     laikago::rcg::MotionTransforms motion_transf_;

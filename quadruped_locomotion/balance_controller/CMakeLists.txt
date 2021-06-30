@@ -135,6 +135,7 @@ catkin_package(
   INCLUDE_DIRS include
   LIBRARIES balance_controller gazebo_state_hardware_interface robot_state_gazebo_ros_control_plugin
   CATKIN_DEPENDS
+  dynamic_reconfigure
   qp_solver
   roscpp
   free_gait_core
@@ -157,6 +158,7 @@ catkin_package(
   ooqp_eigen_interface
   pronto_quadruped_commons
   laikago_robcogen
+  pronto_laikago_commons
   DEPENDS iitgenlaikago
 )
 
@@ -172,6 +174,7 @@ include_directories(
   /home/glx/laikago_catkin/src/quadruped_locomotion/laikago_ros_control/include
   /home/glx/laikago_catkin/src/laikago_ros/laikago_controller/include
   /home/glx/laikago_catkin/src/pronto/pronto_quadruped_commons/include
+  /home/glx/laikago_catkin/src/quadruped_locomotion/pronto_laikago_commons/include
   /home/glx/laikago_catkin/src/quadruped_locomotion/laikago_robcogen/include
   /usr/local/include
   ${catkin_INCLUDE_DIRS}
@@ -207,7 +210,7 @@ target_link_libraries(gazebo_state_hardware_interface ${catkin_LIBRARIES})
 add_library(ros_balance_controller
   src/ros_controller/ros_balance_controller.cpp
   )
-target_link_libraries(ros_balance_controller balance_controller ${catkin_LIBRARIES} osqp::osqp)
+target_link_libraries(ros_balance_controller balance_controller ${catkin_LIBRARIES} osqp::osqp pronto_laikago_commons iitgenlaikago)
 
 #add_library(pronto_laikago_commons src/feet_force/forward_kinematics.cpp
 #                            src/feet_force/feet_contact_forces.cpp
@@ -271,6 +274,8 @@ target_link_libraries(single_leg_controller
 add_executable(test_pino test/test_pino.cpp)
 target_link_libraries(test_pino ${catkin_LIBRARIES} pinocchio iitgenlaikago)
 add_executable(balance_controller_manager src/ros_controller/balance_controller_manager.cpp)
+add_executable(test_osqp test/test_osqp.cpp)
+target_link_libraries(test_osqp ${catkin_LIBRARIES} osqp::osqp)
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
 ## target back to the shorter version for ease of user use

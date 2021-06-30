@@ -102,6 +102,9 @@ class ContactForceDistributionBase
   virtual bool  computeForceDistribution(const Force& virtualForceInBaseFrame,
                                          const Torque& virtualTorqueInBaseFrame,
                                           int leg) = 0;
+  virtual bool computeForceDistribution(const Force& virtualForceInBaseFrame,
+      const Torque& virtualTorqueInBaseFrame,
+        std::vector<double>& _mpc, std::vector<double>& _torque_id) = 0;
   /*!
    * Gets the distributed net forces and torques that act on the base, i.e.
    * this force and torque are computed from the distributed contact forces and

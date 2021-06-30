@@ -17,6 +17,7 @@ find_package(catkin REQUIRED
     tf
     free_gait_msgs
     gazebo_msgs
+    realtime_tools
     )
 
 
@@ -122,6 +123,7 @@ catkin_package(
   tf
   free_gait_msgs
   gazebo_msgs
+  realtime_tools
   DEPENDS
   Boost
 )

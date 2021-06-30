@@ -8,6 +8,9 @@
  */
 #include "balance_controller/ros_controler/ros_balance_controller.hpp"
 #include "controller_manager/controller_manager.h"
+#include "pronto_laikago_commons/feet_contact_forces.hpp"
+#include "pronto_laikago_commons/feet_jacobians.hpp"
+#include "pronto_laikago_commons/forward_kinematics.hpp"
 namespace balance_controller{
 
   RosBalanceController::RosBalanceController()
@@ -257,6 +260,10 @@ namespace balance_controller{
       contact_topic = "/bumper_sensor_filter_node/foot_contacts";
     contact_sub_ = node_handle.subscribe<sim_assiants::FootContacts>(contact_topic, 1, &RosBalanceController::footContactsCallback, this);
 
+    //golaoxu : dynamic tune the params
+//    dynamicReconfigureServer_.reset(new DynamicConfigServer(node_handle));
+//    reconfigureCallbackType_ = boost::bind(&RosBalanceController::dynamicReconfigureCallback, this, _1, _2);
+//    dynamicReconfigureServer_->setCallback(reconfigureCallbackType_);
     //! WSHY: Logged data publisher
 //    joint_command_pub_ = node_handle.advertise<sensor_msgs::JointState>("/balance_controller/joint_command", 1);
 //    base_command_pub_ = node_handle.advertise<nav_msgs::Odometry>("/log/base_command", log_length_);
@@ -286,6 +293,7 @@ namespace balance_controller{
   {
 //    double real_time_factor = 0.001/period.toSec();
 //    ROS_WARN_STREAM("Real Time Factor :"<<real_time_factor<<std::endl);
+    //ROS_INFO("period : %f", period.toSec());
     ROS_INFO_ONCE("Balance Controller Update Once");
 
     //! WSHY: for logging data
@@ -634,7 +642,7 @@ namespace balance_controller{
     if(robot_state->getNumberOfSupportLegs()==0){
         std::vector<int> contact_tmp(4,0);
         for(auto leg:limbs_){
-            std::cout << limbs_state.at(leg)->getState() << "-";
+            //std::cout << limbs_state.at(leg)->getState() << "-";
             if(limbs_state.at(leg)->getState()==8){
                 int _n;
                 switch (leg) {
@@ -657,7 +665,7 @@ namespace balance_controller{
             }
         }
         virtual_model_controller_->getRealcontact_noncontact(contact_tmp);
-        std::cout << std::endl;
+        //std::cout << std::endl;
     }
     bool keep_flag = false;
     if(!virtual_model_controller_->compute())
@@ -1538,7 +1546,7 @@ namespace balance_controller{
           {
             ROS_ERROR_ONCE("real robot coming there!!!!!!!!!!!!!!!");
             real_contact_force_.at(limb).z() = robot_state_handle.contact_pressure_[i];
-            if((robot_state_handle.contact_pressure_[i] - initial_pressure[i]) > contact_pressure_bias)
+            if((robot_state_handle.contact_pressure_[i]) > 10)
               {
 //                robot_state_handle.foot_contact_[i] = 1;
                 real_contact_.at(limb) = true;
@@ -1833,6 +1841,13 @@ namespace balance_controller{
     return true;
   }
 
+  void RosBalanceController::dynamicReconfigureCallback(balance_controller::balance_controllerConfig& config, uint32_t level)
+  {
+    Eigen::Vector3d kp_vec, kd_vec;
+    kp_vec << config.x_dir_kp, config.y_dir_kp, config.z_dir_kp;
+    kd_vec << config.x_dir_kd, config.y_dir_kd, config.z_dir_kd;
+    single_leg_solver_->setGains(kp_vec, kd_vec);
+  }
 
 bool RosBalanceController::loadParams_MPC(const ros::NodeHandle& node_handle){
     if (node_handle.hasParam("/mpc/weights")) {
