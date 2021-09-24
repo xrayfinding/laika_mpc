@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+  <param name = "/free_gait/robot_description"
+         value = "$(find quadruped_model)/urdf/laikago.urdf"
+         />
+  <param name="/free_gait/stop_execution_service" value="/free_gait/stop_execution_service" />
+  <param name="/free_gait/pause_execution_service" value="/free_gait/pause_execution_service" />
+  <param name="/use_gazebo" value="true" /> <!--this should be set true-->
+  <param name="/use_preview" value="false" />
+  <param name="/kinematics_control" value="false" />
+  <param name="/free_gait/adapter_plugin/gazebo" value="free_gait_ros/AdapterGazebo" />
+  <param name="/free_gait/adapter_ros_interface_plugin/gazebo" value="free_gait_ros/AdapterRosInterfaceGazebo" />
+
+  <param name="/use_terrian_map" value="false" />
+  <param name="/step_height" value="0.05" />
+  <param name="/profile_type" value="triangle" />
+  <param name="/step_displacement" value="0.04" />
+
+  <param name="free_gait/action_server" value="/free_gait/action_server" />
+  <param name="/free_gait/preview_topic" value="/free_gait/preview_topic" />
+  <!-- <include file="$(find rqt_free_gait_action)/launch/rqt_free_gait_action.launch"/> -->
+  <node pkg="free_gait_action_loader" type="action_loader.py" name="free_gait_action_loader" output="screen"/>
+
+</launch>

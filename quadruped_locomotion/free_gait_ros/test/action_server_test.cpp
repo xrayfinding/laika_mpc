@@ -92,13 +92,15 @@ public:
     server_.reset(new FreeGaitActionServer(nodeHandle_, "/free_gait/action_server", *executor, *adapter));
     server_->initialize();
     server_->start();
+    ROS_INFO_ONCE("Finish the server, before start thread");
 //    server_->update();
 // YG:线程ActionServerThread不停检查有没有新的goal,如有新的goal就得重新开始规划。
     action_server_thread_ = boost::thread(boost::bind(&ActionServerTest::ActionServerThread, this));
+    ros::Duration(0.5).sleep();
 // YG:步态生成器
     gait_generate_thread_ = boost::thread(boost::bind(&ActionServerTest::GaitGenerateThread, this));
-
   }
+
   ~ActionServerTest() {}
 
   void ActionServerThread()//(const FreeGaitActionServer& server)
@@ -126,7 +128,7 @@ public:
         }
       if(is_kinematics_control)
         joint_state_pub_.publish(allJointStates_);
-      std::cout<<AdapterRos_.getAdapter().getState()<<std::endl;
+      //std::cout<<AdapterRos_.getAdapter().getState()<<std::endl;
       rosPublisher->publish(AdapterRos_.getAdapter().getState());
       while (ros::ok()) {
           server_->update();
@@ -206,7 +208,6 @@ public:
 
 
             }
-
           rate.sleep();
         }
 

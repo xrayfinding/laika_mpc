@@ -23,6 +23,10 @@ FootJac FeetJacobians::getFootJacobian(const JointState& q,
 }
 
 FootJac FeetJacobians::getFootJacobianLF(const JointState& q){
+//    std::cout<<"\n\n" << "Jacs_rows" <<jacs_.fr_base_J_LF_FOOT(q).rows()<<"-";
+//    std::cout<<"Jacs_cols"<<jacs_.fr_base_J_LF_FOOT(q).cols()<<"\n\n";
+//    std::cout<<jacs_.fr_base_J_LF_FOOT<<"\n\n";
+    std::cout << "" << "\n\n";
     return jacs_.fr_base_J_LF_FOOT(q).block<3,3>(LX,0);
 }
 FootJac FeetJacobians::getFootJacobianRF(const JointState& q){

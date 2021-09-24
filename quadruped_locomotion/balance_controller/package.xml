@@ -55,6 +55,7 @@
   <build_export_depend>roscpp</build_export_depend> -->
   <build_depend>free_gait_core</build_depend>
   <build_depend>pronto_laikago_commons</build_depend>
+  <build_depend>wbc</build_depend>
   <build_depend>quadruped_model</build_depend>
   <build_depend>quadruped_odom</build_depend>
   <build_depend>free_gait_ros</build_depend>
@@ -66,6 +67,7 @@
   <build_export_depend>quadruped_robcogen</build_export_depend>
   <build_export_depend>pronto_quadruped_commons</build_export_depend>
   <build_export_depend>pronto_laikago_commons</build_export_depend>
+  <build_export_depend>wbc</build_export_depend>
   <exec_depend>gazebo_dev</exec_depend>
   <exec_depend>pluginlib</exec_depend>
   <exec_depend>controller_interface</exec_depend>
@@ -74,6 +76,7 @@
   <exec_depend>quadruped_odom</exec_depend>
   <exec_depend>free_gait_core</exec_depend>
   <exec_depend>pronto_laikago_commons</exec_depend>
+  <exec_depend>wbc</exec_depend>
   <exec_depend>qp_solver</exec_depend>
   <exec_depend>roscpp</exec_depend>
   <exec_depend>quadruped_robcogen</exec_depend>

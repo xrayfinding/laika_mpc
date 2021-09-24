@@ -82,3 +82,7 @@ mpc:
   #mi:4e-5
   #body_mass: 25.73
   body_mass: 22.73
+
+wbc:
+  hessian_weight: 1.0
+  gradient_weight: 0.001

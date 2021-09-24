@@ -52,10 +52,12 @@ namespace balance_controller {
 VirtualModelController::VirtualModelController(const ros::NodeHandle& node_handle,
                                                std::shared_ptr<free_gait::State> robot_state,
                                                std::shared_ptr<ContactForceDistributionBase> contactForceDistribution,
-                                               std::shared_ptr<MPC::ConvexMpc> convexMpc)
+                                               std::shared_ptr<MPC::ConvexMpc> convexMpc,
+                                               std::shared_ptr<WholeBodyControlOsqp> wbc_computer)
     : MotionControllerBase(node_handle, robot_state),
       contactForceDistribution_(contactForceDistribution),
       convexMpc_(convexMpc),
+      _wbc_computer(wbc_computer),
       gravityCompensationForcePercentage_(1.0)
 {
 
@@ -63,7 +65,16 @@ VirtualModelController::VirtualModelController(const ros::NodeHandle& node_handl
   limbs_.push_back(free_gait::LimbEnum::RF_LEG);
   limbs_.push_back(free_gait::LimbEnum::LH_LEG);
   limbs_.push_back(free_gait::LimbEnum::RH_LEG);
-
+  q_wbc.resize(19);
+  q_wbc.setZero();
+  qdot_wbc.resize(18);
+  qdot_wbc.setZero();
+  q_tar_wbc.resize(19);
+  q_tar_wbc.setZero();
+  qd_tar_wbc.resize(18);
+  qd_tar_wbc.setZero();
+  forceMpc_wbc.resize(12);
+  forceMpc_wbc.setZero();
   dynamicReconfigureServer_.reset(new DynamicConfigServer(node_handle));
   reconfigureCallbackType_ = boost::bind(&VirtualModelController::dynamicReconfigureCallback, this, _1, _2);
   dynamicReconfigureServer_->setCallback(reconfigureCallbackType_);
@@ -150,26 +161,110 @@ bool VirtualModelController::compute()
   //delat_t*=1000;
   //std::cout << "total time " << delat_t << std::endl;
   vector<double> mpc_use(mpc_ans.begin(), mpc_ans.begin()+12);
-  getTorqueFromIDyn(mpc_use);
-  vector<double> leg_torque_id;
-  leg_torque_id.resize(12);
-  for (int i = 0; i < 6; i++) {
-      leg_torque_id[i] = tau(i);
+//  getTorqueFromIDyn(mpc_use);
+//  vector<double> leg_torque_id;
+//  leg_torque_id.resize(12);
+//  for (int i = 0; i < 6; i++) {
+//      leg_torque_id[i] = tau(i);
+//  }
+//  for(int i = 6; i < 9; i++){
+//      leg_torque_id[i] = tau(i+3);
+//  }
+//  for(int i = 9; i < 12; i++){
+//      leg_torque_id[i] = tau(i-3);
+//  }
+//Golaoxu : this is the function that consider the whole body control which use the whole body dynamic model.
+  /*
+   * Golaoxu: update the state and desired states for wbc;
+   *
+   * Attention:
+   *
+   *  States: pos_in_world,qua3,motor12,qua1; ->19x1
+   *          vel,ang_vel,motor12;            ->18x1
+   *
+   *  Desired_states:
+   *          pos_in_world,qua3,foot_pos_in_base,qua1; ->19x1
+   *          vel,ang_vel,foot_pos_vel_in_base;        ->18x1
+   *  TODO:
+   *    1.check the desired foot position for the contact foot;
+   */
+  //***desired_state***:
+  q_tar_wbc.segment(0,3) = robot_state_->getTargetPositionWorldToBaseInWorldFrame().toImplementation();//ok
+  q_tar_wbc(3) = robot_state_->getTargetOrientationBaseToWorld().x();//ok
+  q_tar_wbc(4) = robot_state_->getTargetOrientationBaseToWorld().y();//ok
+  q_tar_wbc(5) = robot_state_->getTargetOrientationBaseToWorld().z();//ok
+  const Eigen::Quaterniond rotation_tmp = robot_state_->getOrientationBaseToWorld().toUnitQuaternion().toImplementation();
+
+  //TODO: translate it to world frame:
+  q_tar_wbc.segment(6,3) = robot_state_->getTargetFootPositionInBaseForLimb(free_gait::LimbEnum::LF_LEG).toImplementation();
+  q_tar_wbc.segment(9,3) = robot_state_->getTargetFootPositionInBaseForLimb(free_gait::LimbEnum::RF_LEG).toImplementation();
+  q_tar_wbc.segment(12,3) = robot_state_->getTargetFootPositionInBaseForLimb(free_gait::LimbEnum::LH_LEG).toImplementation();
+  q_tar_wbc.segment(15,3) = robot_state_->getTargetFootPositionInBaseForLimb(free_gait::LimbEnum::RH_LEG).toImplementation();
+  for(int i=0; i < 4; i++){
+      q_tar_wbc.segment(i*3+6, 3) = rotation_tmp * q_tar_wbc.segment(i*3+6, 3);
+  }
+  q_tar_wbc(18) = robot_state_->getTargetOrientationBaseToWorld().w();//ok
+
+  qd_tar_wbc.segment(0,3) = robot_state_->getTargetLinearVelocityBaseInWorldFrame().toImplementation();//ok
+  //TODO: translate it to world frame:
+  qd_tar_wbc.segment(3,3) = robot_state_->getTargetAngularVelocityBaseInBaseFrame().toImplementation();
+  qd_tar_wbc.segment(6,3) = robot_state_->getTargetFootVelocityInBaseForLimb(free_gait::LimbEnum::LF_LEG).toImplementation();
+  qd_tar_wbc.segment(9,3) = robot_state_->getTargetFootVelocityInBaseForLimb(free_gait::LimbEnum::RF_LEG).toImplementation();
+  qd_tar_wbc.segment(12,3) = robot_state_->getTargetFootVelocityInBaseForLimb(free_gait::LimbEnum::LH_LEG).toImplementation();
+  qd_tar_wbc.segment(15,3) = robot_state_->getTargetFootVelocityInBaseForLimb(free_gait::LimbEnum::RH_LEG).toImplementation();
+  for(int i = 0; i < 5; i++){
+      qd_tar_wbc.segment(i*3+3, 3) = rotation_tmp * qd_tar_wbc.segment(i*3+3, 3);
+  }
+
+  //***real state for update***:
+  q_wbc.segment(0,3) = robot_state_->getPositionWorldToBaseInWorldFrame().toImplementation();//ok
+  q_wbc(3) = robot_state_->getOrientationBaseToWorld().x();//ok
+  q_wbc(4) = robot_state_->getOrientationBaseToWorld().y();//ok
+  q_wbc(5) = robot_state_->getOrientationBaseToWorld().z();//ok
+  q_wbc.segment(6,3) = robot_state_->getJointPositionsForLimb(free_gait::LimbEnum::LF_LEG).toImplementation();//ok
+  q_wbc.segment(9,3) = robot_state_->getJointPositionsForLimb(free_gait::LimbEnum::RF_LEG).toImplementation();//ok
+  q_wbc.segment(12,3) = robot_state_->getJointPositionsForLimb(free_gait::LimbEnum::LH_LEG).toImplementation();//ok
+  q_wbc.segment(15,3) = robot_state_->getJointPositionsForLimb(free_gait::LimbEnum::RH_LEG).toImplementation();//ok
+  q_wbc(18) = robot_state_->getOrientationBaseToWorld().w();//ok
+
+  qdot_wbc.segment(0,3) = robot_state_->getLinearVelocityBaseInWorldFrame().toImplementation();//ok
+  /*Golaoxu:
+   * Rotate angular vel from frame_base into frame_world
+   */
+  qdot_wbc.segment(3,3) = robot_state_->getAngularVelocityBaseInBaseFrame().toImplementation();//rotate it to world frame;
+  qdot_wbc.segment(3,3) = rotation_tmp * qdot_wbc.segment(3,3);
+  qdot_wbc.segment(6,3) = robot_state_->getJointVelocitiesForLimb(free_gait::LimbEnum::LF_LEG).toImplementation();//ok
+  qdot_wbc.segment(9,3) = robot_state_->getJointVelocitiesForLimb(free_gait::LimbEnum::RF_LEG).toImplementation();//ok
+  qdot_wbc.segment(12,3) = robot_state_->getJointVelocitiesForLimb(free_gait::LimbEnum::LH_LEG).toImplementation();//ok
+  qdot_wbc.segment(15,3) = robot_state_->getJointVelocitiesForLimb(free_gait::LimbEnum::RH_LEG).toImplementation();//ok
+
+  for(int i = 0; i < 6; i++){
+      forceMpc_wbc(i) = mpc_use[i];
   }
   for(int i = 6; i < 9; i++){
-      leg_torque_id[i] = tau(i+3);
+      forceMpc_wbc(i) = mpc_use[i+3];
+      forceMpc_wbc(i+3) = mpc_use[i];
   }
-  for(int i = 9; i < 12; i++){
-      leg_torque_id[i] = tau(i-3);
-  }
-//Golaoxu : this is the function that consider the whole body control which use the whole body dynamic model.
-//  if (!contactForceDistribution_->computeForceDistribution(virtualForceInBaseFrame_, virtualTorqueInBaseFrame_, mpc_use, leg_torque_id)) {
-//    return false;
-//  }
+  contact_state_wbc(0) = foot_contact_states[0];
+  contact_state_wbc(1) = foot_contact_states[1];
+  contact_state_wbc(2) = foot_contact_states[3];
+  contact_state_wbc(3) = foot_contact_states[2];
+  _wbc_computer->update_Sys_and_getTau(q_wbc, qdot_wbc, forceMpc_wbc, contact_state_wbc, tau_wbc, q_tar_wbc,qd_tar_wbc);
   if (!contactForceDistribution_->computeForceDistribution(virtualForceInBaseFrame_, virtualTorqueInBaseFrame_, mpc_use)) {
       return false;
   }
   return true;
+}
+
+
+/*
+ * Golaoxu: update the states and desired states for wbc computer;
+*/
+void VirtualModelController::update_state_wbc_get_tau(Eigen::VectorXd &q_wbc, Eigen::VectorXd &qdot_wbc,
+                                              Eigen::VectorXd &q_tar_wbc, Eigen::VectorXd &qd_tar_wbc,
+                                              const Eigen::VectorXd& f_mpc, const Eigen::VectorXd& contact_state, Eigen::VectorXd& tau_ans){
+    _wbc_computer->update_Sys_and_getTau(q_wbc,qdot_wbc,f_mpc,contact_state,tau_ans,q_tar_wbc,qd_tar_wbc);
+    return;
 }
 
 bool VirtualModelController::QuaternionToEuler_desired(){
@@ -264,7 +359,7 @@ bool VirtualModelController::computeError()
       //torso_->getMeasuredState().getOrientationControlToBase());
 //  if(robot_state_->getOrientationBaseToWorld().x()<0.001&&robot_state_->getOrientationBaseToWorld().y()<0.001){
 //      ROS_WARN("IN THIS BRANCH");
-//      orientationError_ = -orientationControlToBase.boxMinus(test);
+//       = -orientationControlToBase.boxMinus(test);
 //  }
   /***************************************************
    *  Method II
@@ -274,7 +369,7 @@ bool VirtualModelController::computeError()
 //          - torso_->getMeasuredState().getPositionControlToBaseInControlFrame();
 //  positionErrorInBaseFrame_ = torso_->getMeasuredState().getWorldToBaseOrientationInWorldFrame().rotate(positionErrorInWorldFrame_);
 //
-//  orientationError_ = torso_->getDesiredState().getWorldToBaseOrientationInWorldFrame().boxMinus(
+//   = torso_->getDesiredState().getWorldToBaseOrientationInWorldFrame().boxMinus(
 //      torso_->getMeasuredState().getWorldToBaseOrientationInWorldFrame());
 
 
@@ -317,7 +412,12 @@ bool VirtualModelController::computeGravityCompensation()
   return true;
 }
 
-
+/*
+ * Golaoxu :
+ *      WBC:
+ *      computeVirtualForce and computeVirtualTorque can be used in the acc_cmd's(WBC) computation;
+ *
+*/
 bool VirtualModelController::computeVirtualForce()
 {
 

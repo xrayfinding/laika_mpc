@@ -6,7 +6,7 @@
     <xacro:include filename="$(find laikago_description)/robot/materials.xacro"/>
     <xacro:include filename="$(find laikago_description)/robot/leg.xacro"/>
     <xacro:include filename="$(find laikago_gazebo)/launch/gazebo.xacro"/>
-    
+
     <!-- Rollover Protection mode will add an additional stick on the top, use "true" or "false" to switch it. -->
     <xacro:property name="rolloverProtection" value="false"/>
 
@@ -18,8 +18,7 @@
             <parent link="world"/>
             <child link="base"/>
         </joint>
-    </xacro:if> 
-
+    </xacro:if>
     <link name="base">
         <visual>
             <origin rpy="0 0 0" xyz="0 0 0"/>
@@ -55,7 +54,7 @@
             <inertia
                 ixx="${trunk_ixx}" ixy="${trunk_ixy}" ixz="${trunk_ixz}"
                 iyy="${trunk_iyy}" iyz="${trunk_iyz}"
-                izz="${trunk_izz}"/>  
+                izz="${trunk_izz}"/>
         </inertial>
     </link>
 
@@ -85,10 +84,10 @@
                 <inertia
                     ixx="${stick_mass / 2.0 * (stick_radius*stick_radius)}" ixy="0.0" ixz="0.0"
                     iyy="${stick_mass / 12.0 * (3*stick_radius*stick_radius + stick_length*stick_length)}" iyz="0.0"
-                    izz="${stick_mass / 12.0 * (3*stick_radius*stick_radius + stick_length*stick_length)}"/>                   
+                    izz="${stick_mass / 12.0 * (3*stick_radius*stick_radius + stick_length*stick_length)}"/>
             </inertial>
         </link>
-    </xacro:if> 
+    </xacro:if>
 
     <joint name="imu_joint" type="fixed">
         <parent link="trunk"/>

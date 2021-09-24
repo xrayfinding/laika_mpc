@@ -12,7 +12,7 @@
 #include "pronto_laikago_commons/feet_jacobians.hpp"
 #include "pronto_laikago_commons/forward_kinematics.hpp"
 namespace balance_controller{
-
+  using romo::Vector;
   RosBalanceController::RosBalanceController()
   {
 //    state_.reset();
@@ -69,7 +69,6 @@ namespace balance_controller{
       }
 //    store_current_joint_state_flag_ = false;
 //    stored_limb_joint_position_.resize(3);
-
   };
   RosBalanceController::~RosBalanceController()
   {
@@ -85,7 +84,32 @@ namespace balance_controller{
     contact_distribution_.reset(new ContactForceDistribution(node_handle, robot_state));
     loadParams_MPC(node_handle);
     mpc_solver.reset(new MPC::ConvexMpc(body_mass,inertia_list_mpc,4, steps_MPC, delta_t_MPC, _MPC_WEIGHTS,torque_weight));
-    virtual_model_controller_.reset(new VirtualModelController(node_handle, robot_state, contact_distribution_,mpc_solver));
+
+    //Golaoxu : finish the func !!!!!!!!!!!!
+    q_wbc.resize(19);
+    q_wbc.setZero();
+    qdot_wbc.resize(18);
+    qdot_wbc.setZero();
+    q_tar_wbc.resize(19);
+    q_tar_wbc.setZero();
+    qd_tar_wbc.resize(18);
+    qd_tar_wbc.setZero();
+    contacts_state_wbc.resize(4);
+    contacts_state_wbc.setOnes();
+    force_mpc_2_wbc.resize(12);
+    force_mpc_2_wbc.setOnes();
+    //Golaoxu : body mass can different between WBC and MPC;
+    // we can change the mass_wbc using a delta value from MPC_mass;
+    mass_wbc = body_mass;
+    if(!node_handle.getParam("/wbc/hessian_weight", hessian_weight)){
+        ROS_ERROR("Failed to load weight for hessian_weight wbc1");
+    }
+    if(!node_handle.getParam("/wbc/gradient_weight", gradient_weight)){
+        ROS_ERROR("Failed to load weight for gradient_weight wbc2");
+    }
+    wbc_computer.reset(new WholeBodyControlOsqp(q_wbc, qdot_wbc, contacts_state_wbc, force_mpc_2_wbc, mass_wbc, 18, hessian_weight, gradient_weight));
+
+    virtual_model_controller_.reset(new VirtualModelController(node_handle, robot_state, contact_distribution_,mpc_solver,wbc_computer));
     //! WSHY: single leg controller
     single_leg_solver_.reset(new MyRobotSolver(node_handle, robot_state));
     single_leg_solver_->model_initialization();
@@ -668,6 +692,57 @@ namespace balance_controller{
         //std::cout << std::endl;
     }
     bool keep_flag = false;
+    /*
+     * Golaoxu: update the state and desired states for wbc;
+     *
+     * Attention:
+     *
+     *  States: pos_in_world,qua3,motor12,qua1; ->19x1
+     *          vel,ang_vel,motor12;            ->18x1
+     *
+     *  Desired_states:
+     *          pos_in_world,qua3,foot_pos_in_base,qua1; ->19x1
+     *          vel,ang_vel,foot_pos_vel_in_base;        ->18x1
+     */
+    //desired_state:
+    q_tar_wbc.segment(0,3) = robot_state->getTargetPositionWorldToBaseInWorldFrame().toImplementation();
+    q_tar_wbc(3) = robot_state->getTargetOrientationBaseToWorld().x();
+    q_tar_wbc(4) = robot_state->getTargetOrientationBaseToWorld().y();
+    q_tar_wbc(5) = robot_state->getTargetOrientationBaseToWorld().z();
+    q_tar_wbc.segment(6,3) = robot_state->getTargetFootPositionInBaseForLimb(free_gait::LimbEnum::LF_LEG).toImplementation();
+    q_tar_wbc.segment(9,3) = robot_state->getTargetFootPositionInBaseForLimb(free_gait::LimbEnum::RF_LEG).toImplementation();
+    q_tar_wbc.segment(12,3) = robot_state->getTargetFootPositionInBaseForLimb(free_gait::LimbEnum::LH_LEG).toImplementation();
+    q_tar_wbc.segment(15,3) = robot_state->getTargetFootPositionInBaseForLimb(free_gait::LimbEnum::RH_LEG).toImplementation();
+    q_tar_wbc(18) = robot_state->getTargetOrientationBaseToWorld().w();
+
+    qd_tar_wbc.segment(0,3) = robot_state->getTargetLinearVelocityBaseInWorldFrame().toImplementation();
+    qd_tar_wbc.segment(3,3) = robot_state->getTargetAngularVelocityBaseInBaseFrame().toImplementation();
+    qd_tar_wbc.segment(6,3) = robot_state->getTargetFootVelocityInBaseForLimb(free_gait::LimbEnum::LF_LEG).toImplementation();
+    qd_tar_wbc.segment(9,3) = robot_state->getTargetFootVelocityInBaseForLimb(free_gait::LimbEnum::RF_LEG).toImplementation();
+    qd_tar_wbc.segment(12,3) = robot_state->getTargetFootVelocityInBaseForLimb(free_gait::LimbEnum::LH_LEG).toImplementation();
+    qd_tar_wbc.segment(15,3) = robot_state->getTargetFootVelocityInBaseForLimb(free_gait::LimbEnum::RH_LEG).toImplementation();
+    //real state:
+    q_wbc.segment(0,3) = robot_state->getPositionWorldToBaseInWorldFrame().toImplementation();
+    q_wbc(3) = robot_state->getOrientationBaseToWorld().x();
+    q_wbc(4) = robot_state->getOrientationBaseToWorld().y();
+    q_wbc(5) = robot_state->getOrientationBaseToWorld().z();
+    q_wbc.segment(6,3) = robot_state->getJointPositionsForLimb(free_gait::LimbEnum::LF_LEG).toImplementation();
+    q_wbc.segment(9,3) = robot_state->getJointPositionsForLimb(free_gait::LimbEnum::RF_LEG).toImplementation();
+    q_wbc.segment(12,3) = robot_state->getJointPositionsForLimb(free_gait::LimbEnum::LH_LEG).toImplementation();
+    q_wbc.segment(15,3) = robot_state->getJointPositionsForLimb(free_gait::LimbEnum::RH_LEG).toImplementation();
+    q_wbc(18) = robot_state->getOrientationBaseToWorld().w();
+
+    qdot_wbc.segment(0,3) = robot_state->getLinearVelocityBaseInWorldFrame().toImplementation();
+    qdot_wbc.segment(3,3) = robot_state->getAngularVelocityBaseInBaseFrame().toImplementation();
+    qdot_wbc.segment(6,3) = robot_state->getJointVelocitiesForLimb(free_gait::LimbEnum::LF_LEG).toImplementation();
+    qdot_wbc.segment(9,3) = robot_state->getJointVelocitiesForLimb(free_gait::LimbEnum::RF_LEG).toImplementation();
+    qdot_wbc.segment(12,3) = robot_state->getJointVelocitiesForLimb(free_gait::LimbEnum::LH_LEG).toImplementation();
+    qdot_wbc.segment(15,3) = robot_state->getJointVelocitiesForLimb(free_gait::LimbEnum::RH_LEG).toImplementation();
+    /*
+     * Golaoxu
+     * Update for WBC:
+     */
+
     if(!virtual_model_controller_->compute())
       {
         ROS_ERROR("VMC compute failed");
@@ -1546,14 +1621,19 @@ namespace balance_controller{
           {
             ROS_ERROR_ONCE("real robot coming there!!!!!!!!!!!!!!!");
             real_contact_force_.at(limb).z() = robot_state_handle.contact_pressure_[i];
-            if((robot_state_handle.contact_pressure_[i]) > 10)
-              {
-//                robot_state_handle.foot_contact_[i] = 1;
+            if(robot_state_handle.getPosition()[2]<0.3){
+                robot_state_handle.foot_contact_[i] = 1;
                 real_contact_.at(limb) = true;
-              }else {
-//                robot_state_handle.foot_contact_[i] = 0;
-                real_contact_.at(limb) = true;
-              }
+            }else{
+                if((robot_state_handle.contact_pressure_[i]) > 1)
+                  {
+                    robot_state_handle.foot_contact_[i] = 1;
+                    real_contact_.at(limb) = true;
+                  }else {
+                    robot_state_handle.foot_contact_[i] = 0;
+                    real_contact_.at(limb) = false;
+                  }
+            }
           }
 
 

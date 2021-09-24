@@ -46,6 +46,7 @@
 // Contact force distribution
 #include "balance_controller/contact_force_distribution/ContactForceDistributionBase.hpp"
 #include "balance_controller/contact_force_distribution/mpc_forcedistribution.hpp"
+#include "balance_controller/contact_force_distribution/wbc_torque.hpp"
 
 // Locomotion controller commons
 //#include "loco/common/TypeDefs.hpp"
@@ -64,7 +65,6 @@
 #include "pronto_laikago_commons/feet_jacobians.hpp"
 #include "pronto_laikago_commons/forward_kinematics.hpp"
 #include "geometry_msgs/PoseWithCovariance.h"
-
 #include <ctime>
 namespace balance_controller {
 using laikago::FeetContactForces;
@@ -81,7 +81,8 @@ class VirtualModelController : public MotionControllerBase
   VirtualModelController(const ros::NodeHandle& node_handle,
                          std::shared_ptr<free_gait::State> robot_state,
                          std::shared_ptr<ContactForceDistributionBase> contactForceDistribution,
-                         std::shared_ptr<MPC::ConvexMpc> convexMpc);
+                         std::shared_ptr<MPC::ConvexMpc> convexMpc,
+                         std::shared_ptr<WholeBodyControlOsqp> wbc_computer);
   /*!
    * Destructor.
    */
@@ -110,7 +111,9 @@ class VirtualModelController : public MotionControllerBase
    */
   bool compute();
 
-
+  void update_state_wbc_get_tau(Eigen::VectorXd& q_wbc, Eigen::VectorXd& qdot_wbc,
+                        Eigen::VectorXd& q_tar_wbc, Eigen::VectorXd& qd_tar_wbc,
+                                const Eigen::VectorXd& f_mpc, const Eigen::VectorXd& contact_state, Eigen::VectorXd& tau_ans);
   friend std::ostream& operator << (std::ostream& out, const VirtualModelController& motionController);
 
 
@@ -166,7 +169,10 @@ class VirtualModelController : public MotionControllerBase
  private:
   std::shared_ptr<ContactForceDistributionBase> contactForceDistribution_;
   std::shared_ptr<MPC::ConvexMpc> convexMpc_;
-  /*
+  std::shared_ptr<WholeBodyControlOsqp> _wbc_computer;
+
+
+  /*Golaoxu:
    * following is a adapter convert datas from kindr to convexMpc
    */
   std::vector<double> com_position;
@@ -182,6 +188,17 @@ class VirtualModelController : public MotionControllerBase
   std::vector<double> desired_com_angular_velocity;
   std::vector<double> desired_quaternion;
   std::vector<double> quaternion;
+
+  /*Golaoxu:
+   * Following is a adapter convert datas to WBC
+   */
+  Eigen::VectorXd q_wbc;
+  Eigen::VectorXd qdot_wbc;
+  Eigen::VectorXd q_tar_wbc;
+  Eigen::VectorXd qd_tar_wbc;
+  Eigen::VectorXd forceMpc_wbc;
+  Eigen::Vector4d contact_state_wbc;
+  Eigen::VectorXd tau_wbc;
 
   //this real contacts is used when there is non leg is choosed by the state_machien
   std::vector<int> contacts_zero;

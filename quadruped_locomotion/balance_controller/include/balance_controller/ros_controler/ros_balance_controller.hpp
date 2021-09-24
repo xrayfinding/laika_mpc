@@ -14,6 +14,7 @@
 #include "balance_controller/contact_force_distribution/ContactForceDistribution.hpp"
 #include "balance_controller/contact_force_distribution/ContactForceDistributionBase.hpp"
 #include "balance_controller/contact_force_distribution/mpc_forcedistribution.hpp"
+#include "balance_controller/contact_force_distribution/wbc_torque.hpp"
 
 #include "balance_controller/motion_control/MotionControllerBase.hpp"
 #include "balance_controller/motion_control/VirtualModelController.hpp"
@@ -162,6 +163,8 @@ namespace balance_controller {
      */
     std::shared_ptr<ContactForceDistribution> contact_distribution_;
     std::shared_ptr<MPC::ConvexMpc> mpc_solver;
+    std::shared_ptr<WholeBodyControlOsqp> wbc_computer;
+
     /**
      * @brief virtual_model_controller_, pointer to virtual model controller
      */
@@ -269,6 +272,17 @@ namespace balance_controller {
     /*
      * Golaoxu : for whole body control test
      */
+    Eigen::VectorXd q_wbc;
+    Eigen::VectorXd qdot_wbc;
+    Eigen::VectorXd q_tar_wbc;
+    Eigen::VectorXd qd_tar_wbc;
+    Eigen::VectorXd contacts_state_wbc;
+    Eigen::VectorXd force_mpc_2_wbc;
+    double mass_wbc;
+    double state_dim_wbc;
+    double hessian_weight;
+    double gradient_weight;
+
     //FeetContactForces torque_IDyn;
   };
 

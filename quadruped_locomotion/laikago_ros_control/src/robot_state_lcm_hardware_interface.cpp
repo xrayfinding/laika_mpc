@@ -350,22 +350,22 @@ void RobotStateLcmHardwareInterface::getFootForces(laikago_msgs::LowState &low_s
     rh_contact_force.wrench.force.z = low_state.footForce[2];
     lh_contact_force.wrench.force.z = low_state.footForce[3];
 
-    if(rf_contact_force.wrench.force.z>30){
+    if(rf_contact_force.wrench.force.z>1){
         footstate_.data[1]=1.0;
     }else{
         footstate_.data[1]=0.0;
     }
-    if(lf_contact_force.wrench.force.z>30){
+    if(lf_contact_force.wrench.force.z>1){
         footstate_.data[0]=1.0;
     }else{
         footstate_.data[0]=0.0;
     }
-    if(rh_contact_force.wrench.force.z>30){
+    if(rh_contact_force.wrench.force.z>1){
         footstate_.data[2]=1.0;
     }else{
         footstate_.data[2]=0.0;
     }
-    if(lh_contact_force.wrench.force.z>30){
+    if(lh_contact_force.wrench.force.z>1){
         footstate_.data[3]=1.0;
     }else{
         footstate_.data[3]=0.0;

@@ -11,6 +11,7 @@
 #include "balance_controller/ros_controler/ros_mpc_controller.hpp"
 #include "controller_manager/controller_manager.h"
 namespace balance_controller{
+    using romo::Vector;
     RosMpcController::RosMpcController(){
         log_length_ = 10000;
         log_index_ = log_length_;

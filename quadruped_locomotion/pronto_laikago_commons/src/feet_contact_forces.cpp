@@ -56,6 +56,10 @@ bool FeetContactForces::getFootGRF(const JointState &q,
                                         qdd);
 
     // 3 joints of the LF leg, on a 3x1 vector;
+    //Attention: getLegJointState(int,const vec1) return sub_mat from the vec1 !!!
+//    std::cout << "tau all " << tau << std::endl;
+//    std::cout << "h_joint "<< h_joints << std::endl;
+
     Eigen::Vector3d tau_leg = pronto::quadruped::getLegJointState(LegID(leg), tau);//joint torque state
     Eigen::Vector3d h_leg = pronto::quadruped::getLegJointState(LegID(leg), h_joints);
     Eigen::Matrix3d M_leg = jsim_.getFixedBaseBlock().block<3, 3>(leg * 3, leg * 3);

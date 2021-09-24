@@ -38,10 +38,10 @@ namespace balance_controller {
         contactForces_[limb] = Vector(0,0,0);
       }
     joint_commands_.resize(12);
-    foot_positions[free_gait::LimbEnum::LF_LEG] = Vector(0.21935,0.1245,-0.35);
-    foot_positions[free_gait::LimbEnum::RF_LEG] = Vector(0.21935,-0.1245,-0.35);
-    foot_positions[free_gait::LimbEnum::RH_LEG] = Vector(-0.21935,-0.1245,-0.35);
-    foot_positions[free_gait::LimbEnum::LH_LEG] = Vector(-0.21935,0.1245,-0.35);
+    foot_positions[free_gait::LimbEnum::LF_LEG] = Vector(0.21935,0.1245,-0.3);
+    foot_positions[free_gait::LimbEnum::RF_LEG] = Vector(0.21935,-0.1245,-0.3);
+    foot_positions[free_gait::LimbEnum::RH_LEG] = Vector(-0.21935,-0.1245,-0.3);
+    foot_positions[free_gait::LimbEnum::LH_LEG] = Vector(-0.21935,0.1245,-0.3);
     real_time_ = true;
 
   };
@@ -71,8 +71,6 @@ namespace balance_controller {
       ROS_ERROR("Failed to parse urdf file");
       return false;
     }
-
-    //MXR::NOTE: load parameter from /home/mxr/catkin_laikago/src/quadruped_locomotion/balance_controller/config/control22.yaml
     std::string param_name = "legs";
     if(!node_handle.getParam(param_name, leg_names))
       {
@@ -258,7 +256,6 @@ namespace balance_controller {
     free_gait::Force gravity_in_base = free_gait::Force(0,0,-9.8);
     for(unsigned int i =0; i<leg_to_move.size(); i++)
       {
-
         free_gait::LimbEnum limb = leg_to_move[i];
         int start_index = static_cast<int>(leg_to_move[i])*3;
 //        std::cout<<"Num of leg to move "<<leg_to_move.size()<<endl<<"update leg "<<start_index/3<<endl;
@@ -325,6 +322,7 @@ namespace balance_controller {
                     double effort_command;
                     if(is_cartisian_motion_.at(limb))
                       effort_command = single_leg_solver_->getVecTauAct()[j - start_index];
+                    //ROS_INFO("%f",effort_command);
                     if(effort_command>20.0)
                       effort_command = 20.0;
                     if(effort_command<-20.0)
@@ -527,7 +525,7 @@ namespace balance_controller {
 
     base_pose.position.x = 0;
     base_pose.position.y = 0;
-    base_pose.position.z = 0.42;
+    base_pose.position.z = 0.0;
     base_pose.orientation.w = 1;
     base_pose.orientation.x = 0;
     base_pose.orientation.y = 0;

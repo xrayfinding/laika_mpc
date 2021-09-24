@@ -142,7 +142,7 @@ using namespace free_gait;
     hip_dispacement.emplace(LimbEnum::RF_LEG, Position(0,-step_displacement,0));
     hip_dispacement.emplace(LimbEnum::LH_LEG, Position(0,step_displacement,0));
     hip_dispacement.emplace(LimbEnum::RH_LEG, Position(0,-step_displacement,0));
-    height_ = 0.42;
+    height_ = 0.38;
 
     sigma_st_0 = 0.8;
     sigma_st_1 = 0.8;

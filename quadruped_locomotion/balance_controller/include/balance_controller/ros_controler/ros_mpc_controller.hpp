@@ -36,6 +36,7 @@
 #include "tinyxml.h"
 
 namespace balance_controller {
+using romo::Vector;
 class RosMpcController : public controller_interface::Controller<hardware_interface::RobotStateInterface>
 {
     typedef std::unordered_map<free_gait::LimbEnum, std::unique_ptr<StateSwitcher>, EnumClassHash> LimbState;

@@ -36,10 +36,12 @@ find_package(catkin REQUIRED COMPONENTS
   pronto_quadruped_commons
   laikago_robcogen
   pronto_laikago_commons
+  wbc
 )
 find_package(osqp REQUIRED)
 find_library(pinocchio COMPONENTS URDFReader REQUIRED)
 find_library(iitgenlaikago REQUIRED)
+find_package(wbc REQUIRED)
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
@@ -159,6 +161,7 @@ catkin_package(
   pronto_quadruped_commons
   laikago_robcogen
   pronto_laikago_commons
+  wbc
   DEPENDS iitgenlaikago
 )
 
@@ -176,6 +179,7 @@ include_directories(
   /home/glx/laikago_catkin/src/pronto/pronto_quadruped_commons/include
   /home/glx/laikago_catkin/src/quadruped_locomotion/pronto_laikago_commons/include
   /home/glx/laikago_catkin/src/quadruped_locomotion/laikago_robcogen/include
+  /home/glx/laikago_catkin/src/wbc/include
   /usr/local/include
   ${catkin_INCLUDE_DIRS}
 )
@@ -195,6 +199,7 @@ add_library(${PROJECT_NAME}
    src/contact_force_distribution/ContactForceDistributionBase.cpp
    src/contact_force_distribution/ContactForceDistribution.cpp
    src/contact_force_distribution/mpc_forcedistribution.cpp
+   src/contact_force_distribution/wbc_torque.cpp
 #   src/feet_force/feet_contact_force.cpp
    src/state_switcher/StateSwitcher.cpp
    src/state_switcher/StateSwitcherBase.cpp
@@ -272,7 +277,7 @@ target_link_libraries(single_leg_controller
 # add_executable(${PROJECT_NAME}_node src/balance_controller_node.cpp)
 #add_executable(balance_controller_test_node test/test.cpp)
 add_executable(test_pino test/test_pino.cpp)
-target_link_libraries(test_pino ${catkin_LIBRARIES} pinocchio iitgenlaikago)
+target_link_libraries(test_pino ${catkin_LIBRARIES} pinocchio iitgenlaikago wbc osqp::osqp)
 add_executable(balance_controller_manager src/ros_controller/balance_controller_manager.cpp)
 add_executable(test_osqp test/test_osqp.cpp)
 target_link_libraries(test_osqp ${catkin_LIBRARIES} osqp::osqp)

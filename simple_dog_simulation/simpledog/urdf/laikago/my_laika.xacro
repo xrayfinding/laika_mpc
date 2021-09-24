@@ -19,6 +19,13 @@
             <child link="base"/>
         </joint>
     </xacro:if>
+    <!-- <link name="world"/>
+
+    <joint name="base_static_joint1" type="fixed">
+        <origin rpy="0 0 0" xyz="0 0 1"/>
+        <parent link="world"/>
+        <child link="base"/>
+    </joint> -->
 
     <link name="base">
         <visual>

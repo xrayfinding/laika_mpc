@@ -13,8 +13,8 @@ state_estimate_update:
 
 single_leg_controller:
   type: "balance_controller/SingleLegController"
-  joints: ['LF_HAA', 'LF_HFE', 'LF_KFE']
-  legs: ['LF_LEG']
+  joints: ['LF_HAA', 'LF_HFE', 'LF_KFE', 'RF_HAA', 'RF_HFE', 'RF_KFE', 'RH_HAA', 'RH_HFE', 'RH_KFE', 'LH_HAA', 'LH_HFE', 'LH_KFE']
+  legs: ['LF_LEG', 'RF_LEG', 'RH_LEG', 'LH_LEG']
   control_methods: ['end_position']
   real_time: true
 
