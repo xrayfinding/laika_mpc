@@ -45,7 +45,7 @@
   </include>
   <param name="/free_gait/robot_state" value="/legodom/robot_states" />
 
-  <param name="/real_time_factor" value="0.40" />
+  <param name="/real_time_factor" value="0.36" />
   <param name="/cal_fator_x" value="1.25" />
   <param name="/cal_fator_y" value="1.25" />
   <param name="/cal_fator_z" value="1.0" />

@@ -101,6 +101,9 @@ class ContactForceDistributionBase
                                           std::vector<double>& _mpc) = 0;
   virtual bool  computeForceDistribution(const Force& virtualForceInBaseFrame,
                                          const Torque& virtualTorqueInBaseFrame,
+                                          std::vector<double>& _mpc, bool only_mpc) = 0;
+  virtual bool  computeForceDistribution(const Force& virtualForceInBaseFrame,
+                                         const Torque& virtualTorqueInBaseFrame,
                                           int leg) = 0;
   virtual bool computeForceDistribution(const Force& virtualForceInBaseFrame,
       const Torque& virtualTorqueInBaseFrame,

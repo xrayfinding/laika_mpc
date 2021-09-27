@@ -91,7 +91,7 @@ mpc:
   #delta_t_MPC: 0.05
   delta_t_MPC: 0.025
   #mi:0.025
-  torque_weight: 0.000002
+  torque_weight: 0.0000025
   #mi:4e-5
   #body_mass: 25.73
   body_mass: 22.73

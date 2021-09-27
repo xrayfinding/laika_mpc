@@ -214,6 +214,18 @@ JointTorques& QuadrupedState::getJointTorques()
   return joint_torques_;
 }
 
+Eigen::Vector3d QuadrupedState::getJointPositionLimb(const LimbEnum &limb) const{
+    JointPositionsLimb jointPositions = current_limb_joints_.at(limb);
+    Eigen::Vector3d jointPosLeg = jointPositions.toImplementation();
+    return  jointPosLeg;
+}
+
+Eigen::Vector3d QuadrupedState::getJointVelocityLimb(const LimbEnum &limb) const{
+    JointVelocitiesLimb jointVels = current_limb_joint_velocities_.at(limb);
+    Eigen::Vector3d jointVelLeg = jointVels.toImplementation();
+    return jointVelLeg;
+}
+
 const LinearVelocity QuadrupedState::getLinearVelocityBaseInWorldFrame() const
 {
   return base_feedback_linear_velocity_;

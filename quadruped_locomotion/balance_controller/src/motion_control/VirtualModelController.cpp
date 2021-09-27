@@ -161,6 +161,12 @@ bool VirtualModelController::compute()
   //delat_t*=1000;
   //std::cout << "total time " << delat_t << std::endl;
   vector<double> mpc_use(mpc_ans.begin(), mpc_ans.begin()+12);
+  /*Golaoxu :
+   *
+   * This MPC force are in frame world, and need to be translated into base frame -->have done in following code(wbc lines)
+   * !!!
+   */
+
 //  getTorqueFromIDyn(mpc_use);
 //  vector<double> leg_torque_id;
 //  leg_torque_id.resize(12);
@@ -221,10 +227,16 @@ bool VirtualModelController::compute()
   q_wbc(3) = robot_state_->getOrientationBaseToWorld().x();//ok
   q_wbc(4) = robot_state_->getOrientationBaseToWorld().y();//ok
   q_wbc(5) = robot_state_->getOrientationBaseToWorld().z();//ok
-  q_wbc.segment(6,3) = robot_state_->getJointPositionsForLimb(free_gait::LimbEnum::LF_LEG).toImplementation();//ok
-  q_wbc.segment(9,3) = robot_state_->getJointPositionsForLimb(free_gait::LimbEnum::RF_LEG).toImplementation();//ok
-  q_wbc.segment(12,3) = robot_state_->getJointPositionsForLimb(free_gait::LimbEnum::LH_LEG).toImplementation();//ok
-  q_wbc.segment(15,3) = robot_state_->getJointPositionsForLimb(free_gait::LimbEnum::RH_LEG).toImplementation();//ok
+  q_wbc.segment(6,3) = robot_state_->getJointPositionLimb(free_gait::LimbEnum::LF_LEG);//ok
+  q_wbc.segment(9,3) = robot_state_->getJointPositionLimb(free_gait::LimbEnum::RF_LEG);//ok
+  q_wbc.segment(12,3) = robot_state_->getJointPositionLimb(free_gait::LimbEnum::LH_LEG);//ok
+  q_wbc.segment(15,3) = robot_state_->getJointPositionLimb(free_gait::LimbEnum::RH_LEG);//ok
+  //Golaoxu : following 4 line use a funtion that works bad;
+  // Attention!!!
+//  q_wbc.segment(6,3) = robot_state_->getJointPositionsForLimb(free_gait::LimbEnum::LF_LEG).toImplementation();//ok
+//  q_wbc.segment(9,3) = robot_state_->getJointPositionsForLimb(free_gait::LimbEnum::RF_LEG).toImplementation();//ok
+//  q_wbc.segment(12,3) = robot_state_->getJointPositionsForLimb(free_gait::LimbEnum::LH_LEG).toImplementation();//ok
+//  q_wbc.segment(15,3) = robot_state_->getJointPositionsForLimb(free_gait::LimbEnum::RH_LEG).toImplementation();//ok
   q_wbc(18) = robot_state_->getOrientationBaseToWorld().w();//ok
 
   qdot_wbc.segment(0,3) = robot_state_->getLinearVelocityBaseInWorldFrame().toImplementation();//ok
@@ -233,24 +245,54 @@ bool VirtualModelController::compute()
    */
   qdot_wbc.segment(3,3) = robot_state_->getAngularVelocityBaseInBaseFrame().toImplementation();//rotate it to world frame;
   qdot_wbc.segment(3,3) = rotation_tmp * qdot_wbc.segment(3,3);
-  qdot_wbc.segment(6,3) = robot_state_->getJointVelocitiesForLimb(free_gait::LimbEnum::LF_LEG).toImplementation();//ok
-  qdot_wbc.segment(9,3) = robot_state_->getJointVelocitiesForLimb(free_gait::LimbEnum::RF_LEG).toImplementation();//ok
-  qdot_wbc.segment(12,3) = robot_state_->getJointVelocitiesForLimb(free_gait::LimbEnum::LH_LEG).toImplementation();//ok
-  qdot_wbc.segment(15,3) = robot_state_->getJointVelocitiesForLimb(free_gait::LimbEnum::RH_LEG).toImplementation();//ok
-
+  qdot_wbc.segment(6,3) = robot_state_->getJointVelocityLimb(free_gait::LimbEnum::LF_LEG);//ok
+  qdot_wbc.segment(9,3) = robot_state_->getJointVelocityLimb(free_gait::LimbEnum::RF_LEG);//ok
+  qdot_wbc.segment(12,3) = robot_state_->getJointVelocityLimb(free_gait::LimbEnum::LH_LEG);//ok
+  qdot_wbc.segment(15,3) = robot_state_->getJointVelocityLimb(free_gait::LimbEnum::RH_LEG);//ok
+  Eigen::VectorXd force_in_base;
+  force_in_base.resize(12);
+  for(int i = 0; i < 12; i++){
+      force_in_base(i) = mpc_use[i];
+  }
+  //Golaoxu : translate the force into the base frame(The MPC conputer is worked int the world frame)
+  //1.2Change the frame to base_yaw alined world frame;
+  RotationQuaternion world2base = robot_state_->getOrientationBaseToWorld().inverted();
+  Eigen::Quaterniond wor2base_x = world2base.toUnitQuaternion().toImplementation();
+  Eigen::Quaterniond b2w = AngleAxisd(com_roll_pitch_yaw[0], Eigen::Vector3d::UnitX())*
+          AngleAxisd(com_roll_pitch_yaw[1], Eigen::Vector3d::UnitY()) *
+          AngleAxisd(com_roll_pitch_yaw[2], Eigen::Vector3d::UnitZ());
+  Eigen::Quaterniond w2b = b2w.inverse();
+//  Eigen::Quaterniond world2base = rotation_tmp.inverse();
+  for (int i = 0; i < 4; i++) {
+      force_in_base.segment(i*3,3) = w2b*force_in_base.segment(i*3,3);
+  }
+  for(int i = 0; i < 12; i++){
+      mpc_use[i] = force_in_base(i);
+  }
+  /*Golaoxu :
+   * change the contact force for WholeBodyControl;
+   * NOW:
+   *    WBC : real world frame;
+   *    MPC : yaw_aliend world frame;
+   */
+  Eigen::VectorXd force_in_world;
+  force_in_world.resize(12);
+  for (int leg = 0; leg < 4; leg++) {
+      force_in_world.segment(leg*3, 3) = rotation_tmp*force_in_base.segment(leg*3,3);
+  }
   for(int i = 0; i < 6; i++){
-      forceMpc_wbc(i) = mpc_use[i];
+      forceMpc_wbc(i) = force_in_world(i);
   }
   for(int i = 6; i < 9; i++){
-      forceMpc_wbc(i) = mpc_use[i+3];
-      forceMpc_wbc(i+3) = mpc_use[i];
+      forceMpc_wbc(i) = force_in_world(i+3);
+      forceMpc_wbc(i+3) = force_in_world(i);
   }
   contact_state_wbc(0) = foot_contact_states[0];
   contact_state_wbc(1) = foot_contact_states[1];
   contact_state_wbc(2) = foot_contact_states[3];
   contact_state_wbc(3) = foot_contact_states[2];
   _wbc_computer->update_Sys_and_getTau(q_wbc, qdot_wbc, forceMpc_wbc, contact_state_wbc, tau_wbc, q_tar_wbc,qd_tar_wbc);
-  if (!contactForceDistribution_->computeForceDistribution(virtualForceInBaseFrame_, virtualTorqueInBaseFrame_, mpc_use)) {
+  if (!contactForceDistribution_->computeForceDistribution(virtualForceInBaseFrame_, virtualTorqueInBaseFrame_, mpc_use, true)) {
       return false;
   }
   return true;
@@ -312,7 +354,9 @@ bool VirtualModelController::QuaternionToEuler(){
             if(TEST <= -1e-7){
                 sign = -1;
             }
-            euler[2] = -2 * sign * (double)atan2(desired_quaternion[0], desired_quaternion[3]); // yaw
+            //Golaoxu : Error !!!!!!
+            //Why this is desired_quaternion, perhaps I was wrong that time;
+            euler[2] = -2 * sign * (double)atan2(quaternion[0], quaternion[3]); // yaw
 
             euler[1] = sign * (EIGEN_PI / 2.0); // pitch
 
@@ -795,7 +839,59 @@ bool VirtualModelController::collections_4_mpc(bool ways_mit){
     //0319
     //Golaoxu : this has great influence of mpc controller
     //desired_com_angular_velocity[2] = 0.0;
+    /*Golaoxu :
+     * 0926.1
+     * fix some frame problems
+     */
+    com_position[0] = 0;
+    com_position[1] = 0;
+    desired_com_position[0] = 0;
+    desired_com_position[1] = 0;
+    // setting the control frame;
+//    com_roll_pitch_yaw[2] = 0.0;
+//    desired_com_roll_pitch_yaw[2] = 0.0;
 
+    Eigen::Quaterniond b2w = AngleAxisd(com_roll_pitch_yaw[0], Eigen::Vector3d::UnitX())*
+            AngleAxisd(com_roll_pitch_yaw[1], Eigen::Vector3d::UnitY()) *
+            AngleAxisd(com_roll_pitch_yaw[2], Eigen::Vector3d::UnitZ());
+
+    RotationQuaternion world2base = robot_state_->getOrientationBaseToWorld().inverted();
+    _com_velocity = world2base.rotate(_com_velocity);//vel in base
+    _desired_com_velocity  = world2base.rotate(_desired_com_velocity);//des vel in base
+    //Glx : translate the vel from base to the control frame;
+    Eigen::Vector3d com_vel_tmp;
+    Eigen::Vector3d des_com_vel_tmp;
+    for(int i=0;i<3;i++){
+        com_vel_tmp(i) = _com_velocity(i);
+        des_com_vel_tmp(i) = _desired_com_velocity(i);
+    }
+    com_vel_tmp = b2w * com_vel_tmp;
+    des_com_vel_tmp = b2w * des_com_vel_tmp;
+    for(int i = 0; i < 3; i++){
+        com_velocity[i] = com_vel_tmp(i);
+        desired_com_velocity[i] = des_com_vel_tmp(i);
+    }
+    //desired_com_velocity[2] = 0.0;
+    //Glx : rotate the angle_vel to control frame;
+    _desired_com_angular_velocity = robot_state_->getTargetAngularVelocityBaseInBaseFrame();
+    _com_angular_velocity = robot_state_->getAngularVelocityBaseInBaseFrame();
+    Eigen::Vector3d desire_ang_vel_tmp;
+    Eigen::Vector3d ang_vel_tmp;
+    for(int i = 0; i < 3; i++){
+        desire_ang_vel_tmp(i) = _desired_com_angular_velocity(i);
+        ang_vel_tmp(i) = _com_angular_velocity(i);
+    }
+    desire_ang_vel_tmp = b2w * desire_ang_vel_tmp;
+    desired_com_angular_velocity[2] = desire_ang_vel_tmp(2);
+    ang_vel_tmp = b2w * ang_vel_tmp;
+    for(int i=0;i<3;i++){
+        com_angular_velocity[i] = ang_vel_tmp(i);
+    }
+//    std::cout << "RPY : " << com_roll_pitch_yaw[2]<< "--" << desired_com_roll_pitch_yaw[2] << "\n";
+//    desired_com_roll_pitch_yaw[2] = 0;
+//    com_roll_pitch_yaw[2] = 0;
+    /* end of 0926.1
+     */
     return  true;
 }
 

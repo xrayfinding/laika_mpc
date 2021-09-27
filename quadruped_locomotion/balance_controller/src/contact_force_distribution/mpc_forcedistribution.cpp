@@ -392,16 +392,15 @@ std::vector<double> ConvexMpc::ComputeContactForces(
     // First we compute the foot positions in the world frame.
     assert(com_roll_pitch_yaw.size() == k3Dim);
     //Golaoxu : X-Y-Z , can rotate the point coordinate express in base to the coordinate in world
-    // using angele_axisd XYZ is the same as angel_axisd  ZYX --->>>get the same quaternion
     // the Pworld = q*Pbase;
+    // Attention : change the order of ZYX (intrinsic frame/ZY'X'');
     const Quaterniond com_rotation =
-        AngleAxisd(com_roll_pitch_yaw[0], Vector3d::UnitX()) *
+        AngleAxisd(com_roll_pitch_yaw[2], Vector3d::UnitZ()) *
         AngleAxisd(com_roll_pitch_yaw[1], Vector3d::UnitY()) *
-        AngleAxisd(com_roll_pitch_yaw[2], Vector3d::UnitZ());
+        AngleAxisd(com_roll_pitch_yaw[0], Vector3d::UnitX());
 
     assert(foot_positions_body_frame.size()== k3Dim * num_legs_);
-    //Golaoxu : In this func , foot_positions_body_frame is foot_positions_world_frame,
-    //          and no need to calculate.
+    //Golaoxu :
     foot_positions_base_ = Eigen::Map<const MatrixXd>(
         foot_positions_body_frame.data(), k3Dim, num_legs_)
         .transpose();

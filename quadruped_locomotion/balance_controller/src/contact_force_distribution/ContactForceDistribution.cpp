@@ -190,6 +190,64 @@ bool ContactForceDistribution::computeForceDistribution( const Force& virtualFor
   if (isLogging_) updateLoggerData();
   return isForceDistributionComputed_;
 }
+
+bool ContactForceDistribution::computeForceDistribution( const Force& virtualForceInBaseFrame,
+    const Torque& virtualTorqueInBaseFrame,
+    std::vector<double>& force_from_mpc, bool only_mpc)
+{
+
+  if(!checkIfParametersLoaded()) return false;
+
+  resetOptimization();//! WSHY: reset leg contact force and object function parameters
+  prepareLegLoading();
+
+  if (nLegsInForceDistribution_ > 0)
+  {
+      //! WSHY: calculate A, b, S, W
+    prepareOptimization(virtualForceInBaseFrame, virtualTorqueInBaseFrame);
+
+    // TODO Move these function calls to a separate method which can be overwritten
+    // to have different contact force distributions, or let them be activated via parameters.
+    addMinimalForceConstraints();
+    addFrictionConstraints();
+
+    // Has to be called as last
+    addDesiredLegLoadConstraints();
+    //isForceDistributionComputed_ = solveOptimization();
+    isForceDistributionComputed_ = true;
+//    for (auto& legInfo : legInfos_)
+//    {
+
+//      /*
+//       * Torque setpoints should be updated only is leg is support leg.
+//       */
+//      if  (robot_state_->isSupportLeg(legInfo.first)) {
+
+//        if (legInfo.second.isPartOfForceDistribution_)
+//        {
+//          Force contactForce = legInfo.second.desiredContactForce_;//! WSHY: TODO tranform to hip frame
+//          ROS_INFO("contact force for %d is : \n", static_cast<int>(legInfo.first));
+//          std::cout<<contactForce.toImplementation()<<std::endl;
+//        }
+//      }
+//    }
+    if (isForceDistributionComputed_)
+    {
+      computeJointTorques(force_from_mpc, only_mpc);
+    }
+  }
+  else
+  {
+    // No leg is part of the force distribution
+    isForceDistributionComputed_ = true;
+    computeJointTorques();
+  }
+
+  if (isLogging_) updateLoggerData();
+  return isForceDistributionComputed_;
+}
+
+
 bool ContactForceDistribution::computeForceDistribution(const Force& virtualForceInBaseFrame,
     const Torque& virtualTorqueInBaseFrame,
                                                         int in_2_leg){
@@ -1015,6 +1073,42 @@ bool ContactForceDistribution::computeJointTorques(std::vector<double>& _forces,
           }
           jointTorques*=0.9;
           jointTorques += torque_leg_id*0.1;
+          robot_state_->setJointEffortsForLimb(legInfo.first, jointTorques);
+        }
+        else
+        {
+            robot_state_->setJointEffortsForLimb(legInfo.first, free_gait::JointEffortsLeg::Zero());
+        }
+      }
+    }
+    return true;
+}
+
+bool ContactForceDistribution::computeJointTorques(std::vector<double> &_forces, bool only_mpc){
+    const LinearAcceleration gravitationalAccelerationInWorldFrame = LinearAcceleration(0.0,0.0,-9.8);//torso_->getProperties().getGravity();
+    const LinearAcceleration gravitationalAccelerationInBaseFrame = robot_state_->getOrientationBaseToWorld().inverseRotate(gravitationalAccelerationInWorldFrame);//torso_->getMeasuredState().getOrientationWorldToBase().rotate(gravitationalAccelerationInWorldFrame);
+    for (auto& legInfo : legInfos_)
+    {
+
+      /*
+       * Torque setpoints should be updated only is leg is support leg.
+       */
+      if  (robot_state_->isSupportLeg(legInfo.first)) {
+
+        if (legInfo.second.isPartOfForceDistribution_)
+        {
+          Eigen::Matrix3d jacobian = robot_state_->getTranslationJacobianFromBaseToFootInBaseFrame(legInfo.first);
+          int n_leg = static_cast<int>(legInfo.first);
+          std::vector<double> _f;
+          _f.resize(3);
+          for (int i = 0; i < 3; i++) {
+              _f[i] = _forces[i + 3*n_leg];
+          }
+          Force contactForce_MPC;
+          contactForce_MPC << _f[0], _f[1], _f[2];
+          free_gait::JointEffortsLeg jointTorques = free_gait::JointEffortsLeg(jacobian.transpose() * contactForce_MPC.toImplementation());
+          free_gait::JointPositionsLeg joint_position_leg = robot_state_->getJointPositionFeedbackForLimb(legInfo.first);
+          jointTorques += robot_state_->getGravityCompensationForLimb(legInfo.first, joint_position_leg, free_gait::Force(gravitationalAccelerationInBaseFrame.toImplementation()));
           robot_state_->setJointEffortsForLimb(legInfo.first, jointTorques);
         }
         else

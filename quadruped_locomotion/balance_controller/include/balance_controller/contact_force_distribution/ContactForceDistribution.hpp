@@ -130,6 +130,10 @@ class ContactForceDistribution : public ContactForceDistributionBase
       const Torque& virtualTorqueInBaseFrame,
         std::vector<double>& _mpc);
   virtual bool computeForceDistribution(const Force& virtualForceInBaseFrame,
+                                        const Torque& virtualTorqueInBaseFrame,
+                                          std::vector<double>& _mpc,
+                                        bool only_mpc);
+  virtual bool computeForceDistribution(const Force& virtualForceInBaseFrame,
       const Torque& virtualTorqueInBaseFrame,
         int in_2_leg);
   virtual bool computeForceDistribution(const Force& virtualForceInBaseFrame,
@@ -255,6 +259,7 @@ private:
   bool computeJointTorques(std::vector<double>& _forces);
   bool computeJointTorques(std::vector<double>& _forces, std::vector<double>& _torque_id);
   bool computeJointTorques(int leg2leg);
+  bool computeJointTorques(std::vector<double>& _force, bool only_mpc);
   bool resetOptimization();
 
   /*!

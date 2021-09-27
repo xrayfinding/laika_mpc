@@ -37,6 +37,11 @@ public:
   static JointPositions& getJointPositions();
   static JointVelocities& getJointVelocities();
   static JointTorques& getJointTorques();
+/*Golaoxu :
+ *  add a funtion to get states for every legs
+ */
+  Eigen::Vector3d getJointPositionLimb(const LimbEnum& limb) const;
+  Eigen::Vector3d getJointVelocityLimb(const LimbEnum& limb) const;
 
   const JointPositions& getJointPositionFeedback() const;
   const JointPositionsLimb getJointPositionFeedbackForLimb(const LimbEnum& limb) const;

@@ -122,6 +122,8 @@ void State::setIgnoreForPoseAdaptation(const LimbEnum& limb, bool ignorePoseAdap
 const JointPositionsLeg State::getJointPositionsForLimb(const LimbEnum& limb) const
 {
   //TODO(Shunyao): fix state feedback
+  /* Golaoxu : this funtion has problem, dont use it !!!!!!
+   */
   int start, n;
   start = QD::getLimbStartIndexInJ(limb);
   n = QD::getNumDofLimb();

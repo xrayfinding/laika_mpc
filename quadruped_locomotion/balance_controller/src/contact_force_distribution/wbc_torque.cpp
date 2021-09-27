@@ -94,14 +94,22 @@ void WholeBodyControlOsqp::calculate_acc_cmd(const Eigen::VectorXd &p, const Eig
     p_error.segment(3,3) = orientationError;
     dynacore::Vect3 foot_pos_world, base_CoM_world;
     base_CoM_world = p.segment(0,3);
+    cout << "base_CoM_world" << base_CoM_world.transpose() << "\n";
+    cout << "leg 1: " << p.segment(6,3).transpose() << "\n";
     Eigen::VectorXd foot_pos_all;
     foot_pos_all.resize(12);
     for(int i = 1; i <= 4; i++){
         _model->getPos(i, foot_pos_world);
-        foot_pos_world-=base_CoM_world;
+        if(i==1){
+            //TODO : this is not right !!!!!!
+            cout << "foot pos world: " << foot_pos_world.transpose() << "\n";
+        }
+        foot_pos_world -= base_CoM_world;
         foot_pos_all.segment(i*3-3, 3) = foot_pos_world;
     }
     p_error.segment(6,12) = p_target.segment(6,12) - foot_pos_all;
+    cout << "foot pos tar  " << p_target.segment(6,3).transpose() << "\n";
+    cout << "foot pos real " << foot_pos_all.segment(0,3).transpose() << "\n";
     //2: calculate the vel error in the world frame ---> pdot_error;
     pdot_error.segment(0,6) = pdot_target.segment(0,6) - pdot.segment(0,6);
     /*
@@ -140,10 +148,10 @@ void WholeBodyControlOsqp::calculate_acc_cmd(const Eigen::VectorXd &p, const Eig
     pdot_task.segment(0,6) = pdot.segment(0,6);
     pdot_task.segment(6,12) = vel_real_world;
     //Golaoxu : set the foot vel error to 0 for the time being.
+    //pdot_error.segment(6,12).setZero();
     acc_cmd = (kp*(p_error) + delta_t_wbc*kd*pdot_error + delta_t_wbc*kp*pdot_task)/(1+kp*pow(delta_t_wbc, 2)+kd*delta_t_wbc);
     //Golaoxu : set the feedforward to 0;
     acc_cmd = (kp*(p_error) + delta_t_wbc*kd*pdot_error)/(1+kp*pow(delta_t_wbc, 2)+kd*delta_t_wbc);
-    cout << acc_cmd.transpose() << "\n";
     //acc_cmd = -(kp*(p-p_target) + delta_t_wbc*kd*(pdot-pdot_target) + delta_t_wbc*kp*pdot)/(1+kp*pow(delta_t_wbc, 2)+kd*delta_t_wbc);
 }
 /*Golaoxu:
